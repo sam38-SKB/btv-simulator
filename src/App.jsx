@@ -22,7 +22,6 @@ export default function App() {
   const { users, currentUser, login, signup, logout, updateUserStatus, deleteUser } = useAuth();
   const [view, setView] = useState('DASHBOARD');
   
-  // LocalStorage 읽기 오류 예방 검증 로직 적용
   const [bonusRules, setBonusRules] = useState(() => {
     try {
       const saved = localStorage.getItem('btv_bonus_rules');
@@ -39,7 +38,7 @@ export default function App() {
       const saved = localStorage.getItem('btv_surcharge_rules');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (parsed && (parsed.region?.length > 0 || parsed.time?.length > 0)) return parsed;
+        if (parsed && (parsed.BTV || parsed.ADDR3)) return parsed;
       }
     } catch (e) {}
     return DEFAULT_SURCHARGE_RULES;
@@ -86,7 +85,6 @@ export default function App() {
     else { alert('회원가입 신청이 완료되었습니다. 관리자 승인 후 로그인해 주세요.'); setView('LOGIN'); }
   };
 
-  // 볼륨 보너스 동적 변경 핸들러
   const handleUpdateBonus = (platform, actionType, index, field, value) => {
     setBonusRules(prev => {
       const updated = { ...prev };
@@ -99,20 +97,23 @@ export default function App() {
     });
   };
 
-  // 할증 동적 변경 핸들러
-  const handleUpdateSurcharge = (category, actionType, index, field, value) => {
+  // 매체별 타겟팅 할증 동적 변경 핸들러
+  const handleUpdateSurcharge = (platform, category, actionType, index, field, value) => {
     setSurchargeRules(prev => {
       const updated = { ...prev };
-      const list = [...(updated[category] || [])];
+      const platformObj = { ...(updated[platform] || DEFAULT_SURCHARGE_RULES[platform]) };
+      const list = [...(platformObj[category] || [])];
+
       if (actionType === 'ADD') list.push({ id: `S_${Date.now()}`, name: '신규 할증 조건', rate: 10 });
       else if (actionType === 'DELETE') list.splice(index, 1);
       else if (actionType === 'CHANGE') list[index] = { ...list[index], [field]: value };
-      updated[category] = list;
+
+      platformObj[category] = list;
+      updated[platform] = platformObj;
       return updated;
     });
   };
 
-  // 프로모션 동적 변경 핸들러
   const handleUpdatePromo = (platform, actionType, index, field, value) => {
     setPromoRules(prev => {
       const updated = { ...prev };

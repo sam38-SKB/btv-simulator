@@ -14,19 +14,36 @@ export const DEFAULT_BONUS_RULES = {
 };
 
 export const DEFAULT_SURCHARGE_RULES = {
-  region: [
-    { id: 'GANGNAM_5', name: '강남 5개구 타겟팅', rate: 80 },
-    { id: 'SIGUNGU', name: '일반 시/군/구 타겟팅', rate: 20 },
-    { id: 'ALL', name: '전국 타겟팅 (기본)', rate: 0 }
-  ],
-  time: [
-    { id: 'CONTINUOUS_8H', name: '연속 8시간 이상 선택 시간대', rate: 20 },
-    { id: 'ALL', name: '전체 시간대 (기본)', rate: 0 }
-  ],
-  channel: [
-    { id: 'SELECT7', name: '7개 이상의 특정 채널 선택', rate: 40 },
-    { id: 'ALL', name: '전체 채널 (기본)', rate: 0 }
-  ]
+  BTV: {
+    region: [
+      { id: 'GANGNAM_5', name: '강남 5개구 타겟팅', rate: 80 },
+      { id: 'SIGUNGU', name: '일반 시/군/구 타겟팅', rate: 20 },
+      { id: 'ALL', name: '전국 타겟팅 (기본)', rate: 0 }
+    ],
+    time: [
+      { id: 'CONTINUOUS_8H', name: '연속 8시간 이상 선택 시간대', rate: 20 },
+      { id: 'ALL', name: '전체 시간대 (기본)', rate: 0 }
+    ],
+    channel: [
+      { id: 'SELECT7', name: '7개 이상의 특정 채널 선택', rate: 40 },
+      { id: 'ALL', name: '전체 채널 (기본)', rate: 0 }
+    ]
+  },
+  ADDR3: {
+    region: [
+      { id: 'GANGNAM_5', name: '강남 5개구 타겟팅', rate: 80 },
+      { id: 'SIGUNGU', name: '일반 시/군/구 타겟팅', rate: 20 },
+      { id: 'ALL', name: '전국 타겟팅 (기본)', rate: 0 }
+    ],
+    time: [
+      { id: 'CONTINUOUS_8H', name: '연속 8시간 이상 선택 시간대', rate: 20 },
+      { id: 'ALL', name: '전체 시간대 (기본)', rate: 0 }
+    ],
+    channel: [
+      { id: 'SELECT7', name: '7개 이상의 특정 채널 선택', rate: 40 },
+      { id: 'ALL', name: '전체 채널 (기본)', rate: 0 }
+    ]
+  }
 };
 
 export const DEFAULT_PROMO_RULES = {

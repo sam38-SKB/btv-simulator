@@ -1,6 +1,5 @@
 import { useState, useMemo } from 'react';
 import { BTV_PACKAGE_BASE_CPV, BTV_FIXED_20S_BASE_CPV, ADDR3_PRIME_PACK_MAP, VIDEO_LENGTH_INFO } from '../constants/pricingData';
-import { AUDIENCE_DATA } from '../constants/audienceData';
 
 export function useSimulator(bonusRules, surchargeRules, promoRules) {
   const [currentStep, setCurrentStep] = useState(1);
@@ -26,21 +25,21 @@ export function useSimulator(bonusRules, surchargeRules, promoRules) {
 
   const totalBudget = useMemo(() => (Number(monthlyBudget) || 0) * (Number(durationMonths) || 0), [monthlyBudget, durationMonths]);
 
-  // 볼륨 보너스 연산
+  // 정밀 볼륨 보너스 자격 매칭 연산
   const volInfo = useMemo(() => {
     const list = bonusRules[platformMode] || [];
-    const sorted = [...list].sort((a, b) => {
-      const totA = (a.minMonthlyBudget || 0) * (a.minMonths || 1);
-      const totB = (b.minMonthlyBudget || 0) * (b.minMonths || 1);
-      return totB !== totA ? totB - totA : (b.rate || 0) - (a.rate || 0);
-    });
 
     if (!monthlyBudget || !durationMonths) {
       return { rate: 0, label: '월 예산 및 집행 기간을 선택하세요', matched: null, nextTier: null };
     }
 
-    let matched = sorted.find(r => monthlyBudget >= (r.minMonthlyBudget || 0) && durationMonths >= (r.minMonths || 1));
-    if (!matched) matched = sorted[sorted.length - 1] || { minMonthlyBudget: 0, minMonths: 1, rate: 0 };
+    const eligible = list.filter(r => 
+      monthlyBudget >= (r.minMonthlyBudget || 0) && durationMonths >= (r.minMonths || 1)
+    );
+
+    eligible.sort((a, b) => (b.rate || 0) - (a.rate || 0));
+
+    const matched = eligible[0] || { minMonthlyBudget: 0, minMonths: 1, rate: 0 };
 
     const rateVal = matched ? matched.rate / 100 : 0;
     const minM = matched ? (matched.minMonthlyBudget / 10000).toLocaleString() : '0';
@@ -48,8 +47,13 @@ export function useSimulator(bonusRules, surchargeRules, promoRules) {
       ? `월 ${minM}만원 & ${matched.minMonths}개월 이상 (+${matched.rate}%)`
       : `기본 조건 (+${matched.rate}%)`;
 
-    const higherRules = sorted.filter(r => (r.minMonthlyBudget > monthlyBudget || r.minMonths > durationMonths) && r.rate > (matched ? matched.rate : 0));
-    const nextTierObj = higherRules.length > 0 ? higherRules[higherRules.length - 1] : null;
+    const higherRules = list.filter(r => (r.rate || 0) > (matched ? matched.rate : 0));
+    higherRules.sort((a, b) => {
+      const needA = Math.max(0, (a.minMonthlyBudget || 0) - monthlyBudget);
+      const needB = Math.max(0, (b.minMonthlyBudget || 0) - monthlyBudget);
+      return needA !== needB ? needA - needB : (a.minMonths || 1) - (b.minMonths || 1);
+    });
+    const nextTierObj = higherRules[0];
 
     return {
       rate: rateVal,
@@ -105,9 +109,11 @@ export function useSimulator(bonusRules, surchargeRules, promoRules) {
       rawBaseCPV = videoLength === '20' ? Math.ceil(primePack.baseCPV15 * 1.33) : Number((primePack.baseCPV15 * lenObj.mult).toFixed(2));
     }
 
-    const activeReg = (surchargeRules.region || []).find(r => r.id === regionTarget) || { rate: 0 };
-    const activeTime = (surchargeRules.time || []).find(r => r.id === timeTarget) || { rate: 0 };
-    const activeCh = (surchargeRules.channel || []).find(r => r.id === channelTarget) || { rate: 0 };
+    // 매체별 할증 요율 구분 적용
+    const currentSurcharges = surchargeRules[platformMode] || surchargeRules || {};
+    const activeReg = (currentSurcharges.region || []).find(r => r.id === regionTarget) || { rate: 0 };
+    const activeTime = (currentSurcharges.time || []).find(r => r.id === timeTarget) || { rate: 0 };
+    const activeCh = (currentSurcharges.channel || []).find(r => r.id === channelTarget) || { rate: 0 };
 
     const totalSurchargeRate = (activeReg.rate + activeTime.rate + activeCh.rate) / 100;
     let finalAppliedCPV = Number((rawBaseCPV * (1 + totalSurchargeRate)).toFixed(2));

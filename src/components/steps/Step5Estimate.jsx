@@ -6,33 +6,36 @@ export default function Step5Estimate({ state, actions, calculation, surchargeRu
     else actions.setSelectedPromos([...state.selectedPromos, id]);
   };
 
+  // 선택된 매체(BTV / ADDR3)의 할증 옵션 가져오기
+  const activeSurcharges = surchargeRules[state.platformMode] || surchargeRules;
+
   return (
     <div className="bg-slate-800 border border-slate-700 p-6 rounded-2xl shadow-xl space-y-6">
       <div className="flex justify-between items-center border-b border-slate-700 pb-3">
         <h3 className="text-base font-bold text-white flex items-center">
-          <span className="text-red-500 font-extrabold mr-1.5">5.</span> [할증 · 보너스 · 프로모션] 세부 옵션 및 최종 견적 내역 <span className="text-red-400 text-xs ml-3 font-normal">* 필수 선택</span>
+          <span className="text-red-500 font-extrabold mr-1.5">5.</span> [{state.platformMode === 'BTV' ? 'B tv 단독' : 'IPTV 3사 PRIME'}] 할증 · 보너스 · 프로모션 세부 옵션
         </h3>
       </div>
 
       <div>
-        <label className="text-sm font-bold text-slate-200 block mb-2">⚙️ 타겟팅 설정 (할증 조건)</label>
+        <label className="text-sm font-bold text-slate-200 block mb-2">⚙️ 타겟팅 설정 (매체별 할증 조건)</label>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
           <div className="bg-slate-900 p-3 rounded-xl border border-slate-700">
             <label className="text-slate-400 block mb-1">📍 지역 타겟팅</label>
-            <select value={state.regionTarget} onChange={(e) => actions.setRegionTarget(e.target.value)} className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs text-white">
-              {surchargeRules.region.map(r => <option key={r.id} value={r.id}>{r.name} {r.rate > 0 ? `(-${r.rate}%)` : '(-)'}</option>)}
+            <select value={state.regionTarget} onChange={(e) => actions.setRegionTarget(e.target.value)} className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs text-white font-bold">
+              {(activeSurcharges.region || []).map(r => <option key={r.id} value={r.id}>{r.name} {r.rate > 0 ? `(-${r.rate}%)` : '(-)'}</option>)}
             </select>
           </div>
           <div className="bg-slate-900 p-3 rounded-xl border border-slate-700">
             <label className="text-slate-400 block mb-1">⏰ 시간대 타겟팅</label>
-            <select value={state.timeTarget} onChange={(e) => actions.setTimeTarget(e.target.value)} className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs text-white">
-              {surchargeRules.time.map(t => <option key={t.id} value={t.id}>{t.name} {t.rate > 0 ? `(-${t.rate}%)` : '(-)'}</option>)}
+            <select value={state.timeTarget} onChange={(e) => actions.setTimeTarget(e.target.value)} className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs text-white font-bold">
+              {(activeSurcharges.time || []).map(t => <option key={t.id} value={t.id}>{t.name} {t.rate > 0 ? `(-${t.rate}%)` : '(-)'}</option>)}
             </select>
           </div>
           <div className="bg-slate-900 p-3 rounded-xl border border-slate-700">
             <label className="text-slate-400 block mb-1">📺 채널 타겟팅</label>
-            <select value={state.channelTarget} onChange={(e) => actions.setChannelTarget(e.target.value)} className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs text-white">
-              {surchargeRules.channel.map(c => <option key={c.id} value={c.id}>{c.name} {c.rate > 0 ? `(-${c.rate}%)` : '(-)'}</option>)}
+            <select value={state.channelTarget} onChange={(e) => actions.setChannelTarget(e.target.value)} className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs text-white font-bold">
+              {(activeSurcharges.channel || []).map(c => <option key={c.id} value={c.id}>{c.name} {c.rate > 0 ? `(-${c.rate}%)` : '(-)'}</option>)}
             </select>
           </div>
         </div>
@@ -77,7 +80,7 @@ export default function Step5Estimate({ state, actions, calculation, surchargeRu
         </div>
       </div>
 
-      {/* 정밀 산출 내역서 표 */}
+      {/* 산출 내역 표 */}
       <div className="bg-slate-800 border border-slate-700 p-6 rounded-2xl shadow-xl space-y-4 overflow-x-auto">
         <table className="w-full text-left text-sm">
           <thead className="bg-slate-900 text-slate-300 text-xs uppercase border-b border-slate-700">
