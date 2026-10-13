@@ -5,11 +5,13 @@ export default function AdminPanel({
   bonusRules, 
   surchargeRules, 
   promoRules, 
+  onUpdateBonus,
   onUpdateSurcharge, 
   onUpdatePromo, 
   onStatusChange, 
   onDeleteUser, 
   onBackToDashboard, 
+  onResetBonusRules,
   onResetSurchargeRules, 
   onResetPromoRules 
 }) {
@@ -25,7 +27,9 @@ export default function AdminPanel({
       <div className="bg-gradient-to-r from-purple-900/60 to-slate-800 border border-purple-700 p-6 rounded-2xl shadow-xl flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-black text-purple-200">🛡️ B tv Agent 시스템 관리자 페이지</h2>
-          <p className="text-sm text-purple-300/80 mt-1">사용자 가입 승인, 타겟팅 할증 요율, 프로모션 정책을 통제합니다.</p>
+          <p className="text-sm text-purple-300/80 mt-1">
+            사용자 가입 승인, 볼륨 보너스 요율, 타겟팅 할증 요율, 프로모션 정책을 통제합니다.
+          </p>
         </div>
         <button onClick={onBackToDashboard} className="bg-purple-600 hover:bg-purple-500 text-white px-5 py-2.5 rounded-xl font-bold text-sm">
           📊 시뮬레이터로 이동
@@ -48,7 +52,85 @@ export default function AdminPanel({
         </div>
       </div>
 
-      {/* ⚙️ 타겟팅 할증 요율 관리 (추가된 부분) */}
+      {/* 📊 [월 집행 금액 & 집행 기간] 볼륨 보너스 요율 관리 (복원 추가) */}
+      <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-2xl space-y-5">
+        <div className="flex justify-between items-center border-b border-slate-700 pb-3">
+          <h3 className="text-lg font-bold text-white flex items-center">
+            <span className="text-amber-400 mr-2">📊</span> [월 집행 금액 & 집행 기간] 볼륨 보너스 구간 관리
+          </h3>
+          <button onClick={onResetBonusRules} className="bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-600">
+            🔄 보너스 구간 초기화
+          </button>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {['BTV', 'ADDR3'].map(platform => (
+            <div key={platform} className="bg-slate-900 border border-slate-700 p-4 rounded-xl space-y-3 text-xs">
+              <div className="flex justify-between items-center border-b border-slate-800 pb-2">
+                <span className="font-bold text-amber-400">
+                  {platform === 'BTV' ? '📺 B tv 단독 볼륨 보너스' : '🌐 IPTV 3사 PRIME 볼륨 보너스'}
+                </span>
+                <button onClick={() => onUpdateBonus(platform, 'ADD')} className="bg-slate-800 hover:bg-slate-700 text-white px-2.5 py-1 rounded font-bold">
+                  + 구간 추가
+                </button>
+              </div>
+              {(bonusRules[platform] || []).map((rule, idx) => (
+                <div key={idx} className="bg-slate-800 p-3 rounded-lg border border-slate-700 space-y-2">
+                  <div className="flex items-center justify-between text-slate-300">
+                    <span className="font-bold text-slate-200">구간 {idx + 1}</span>
+                    <button onClick={() => onUpdateBonus(platform, 'DELETE', idx)} className="text-red-400 font-bold px-1 hover:text-red-300">
+                      ✕ 삭제
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-slate-400">
+                    <div>
+                      <label className="block text-[11px] mb-1">최소 월예산</label>
+                      <div className="flex items-center space-x-1">
+                        <input 
+                          type="number" 
+                          step={1000} 
+                          value={rule.minMonthlyBudget ? rule.minMonthlyBudget / 10000 : 0} 
+                          onChange={(e) => onUpdateBonus(platform, 'CHANGE', idx, 'minMonthlyBudget', Number(e.target.value) * 10000)} 
+                          className="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1 text-right font-bold text-white text-xs" 
+                        />
+                        <span className="text-[11px] whitespace-nowrap">만원</span>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-[11px] mb-1">최소 기간</label>
+                      <div className="flex items-center space-x-1">
+                        <input 
+                          type="number" 
+                          min={1} 
+                          max={12} 
+                          value={rule.minMonths || 1} 
+                          onChange={(e) => onUpdateBonus(platform, 'CHANGE', idx, 'minMonths', Number(e.target.value))} 
+                          className="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1 text-right font-bold text-white text-xs" 
+                        />
+                        <span className="text-[11px] whitespace-nowrap">개월</span>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-[11px] mb-1">보너스율</label>
+                      <div className="flex items-center space-x-1">
+                        <input 
+                          type="number" 
+                          step={5} 
+                          value={rule.rate || 0} 
+                          onChange={(e) => onUpdateBonus(platform, 'CHANGE', idx, 'rate', Number(e.target.value))} 
+                          className="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1 text-right font-bold text-emerald-400 text-xs" 
+                        />
+                        <span className="text-[11px] font-bold text-emerald-400">%</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ⚙️ 타겟팅 할증 요율 관리 */}
       <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-2xl space-y-5">
         <div className="flex justify-between items-center border-b border-slate-700 pb-3">
           <h3 className="text-lg font-bold text-white flex items-center">

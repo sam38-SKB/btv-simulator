@@ -44,6 +44,19 @@ export default function App() {
     else { alert('회원가입 신청이 완료되었습니다. 관리자 승인 후 로그인해 주세요.'); setView('LOGIN'); }
   };
 
+  // 볼륨 보너스 동적 변경 핸들러 (추가)
+  const handleUpdateBonus = (platform, actionType, index, field, value) => {
+    setBonusRules(prev => {
+      const updated = { ...prev };
+      const list = [...(updated[platform] || [])];
+      if (actionType === 'ADD') list.push({ minMonthlyBudget: 10000000, minMonths: 1, rate: 10 });
+      else if (actionType === 'DELETE') list.splice(index, 1);
+      else if (actionType === 'CHANGE') list[index] = { ...list[index], [field]: value };
+      updated[platform] = list;
+      return updated;
+    });
+  };
+
   // 할증 동적 변경 핸들러
   const handleUpdateSurcharge = (category, actionType, index, field, value) => {
     setSurchargeRules(prev => {
@@ -85,13 +98,14 @@ export default function App() {
             bonusRules={bonusRules}
             surchargeRules={surchargeRules}
             promoRules={promoRules}
+            onUpdateBonus={handleUpdateBonus}
             onUpdateSurcharge={handleUpdateSurcharge}
             onUpdatePromo={handleUpdatePromo}
             onStatusChange={updateUserStatus}
             onDeleteUser={deleteUser}
             onBackToDashboard={() => setView('DASHBOARD')}
-            onResetSurchargeRules={() => setSurchargeRules(DEFAULT_SURCHARGE_RULES)}
             onResetBonusRules={() => setBonusRules(DEFAULT_BONUS_RULES)}
+            onResetSurchargeRules={() => setSurchargeRules(DEFAULT_SURCHARGE_RULES)}
             onResetPromoRules={() => setPromoRules(DEFAULT_PROMO_RULES)}
           />
         ) : (
