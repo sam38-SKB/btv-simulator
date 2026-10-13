@@ -23,7 +23,7 @@ export default function App() {
   const [view, setView] = useState('DASHBOARD');
   
   const [bonusRules, setBonusRules] = useState(DEFAULT_BONUS_RULES);
-  const [surchargeRules] = useState(DEFAULT_SURCHARGE_RULES);
+  const [surchargeRules, setSurchargeRules] = useState(DEFAULT_SURCHARGE_RULES);
   const [promoRules, setPromoRules] = useState(DEFAULT_PROMO_RULES);
 
   const simulator = useSimulator(bonusRules, surchargeRules, promoRules);
@@ -44,6 +44,20 @@ export default function App() {
     else { alert('회원가입 신청이 완료되었습니다. 관리자 승인 후 로그인해 주세요.'); setView('LOGIN'); }
   };
 
+  // 할증 동적 변경 핸들러
+  const handleUpdateSurcharge = (category, actionType, index, field, value) => {
+    setSurchargeRules(prev => {
+      const updated = { ...prev };
+      const list = [...(updated[category] || [])];
+      if (actionType === 'ADD') list.push({ id: `S_${Date.now()}`, name: '신규 할증 조건', rate: 10 });
+      else if (actionType === 'DELETE') list.splice(index, 1);
+      else if (actionType === 'CHANGE') list[index] = { ...list[index], [field]: value };
+      updated[category] = list;
+      return updated;
+    });
+  };
+
+  // 프로모션 동적 변경 핸들러
   const handleUpdatePromo = (platform, actionType, index, field, value) => {
     setPromoRules(prev => {
       const updated = { ...prev };
@@ -69,11 +83,14 @@ export default function App() {
           <AdminPanel
             users={users}
             bonusRules={bonusRules}
+            surchargeRules={surchargeRules}
             promoRules={promoRules}
+            onUpdateSurcharge={handleUpdateSurcharge}
             onUpdatePromo={handleUpdatePromo}
             onStatusChange={updateUserStatus}
             onDeleteUser={deleteUser}
             onBackToDashboard={() => setView('DASHBOARD')}
+            onResetSurchargeRules={() => setSurchargeRules(DEFAULT_SURCHARGE_RULES)}
             onResetBonusRules={() => setBonusRules(DEFAULT_BONUS_RULES)}
             onResetPromoRules={() => setPromoRules(DEFAULT_PROMO_RULES)}
           />
@@ -90,7 +107,7 @@ export default function App() {
         )}
       </main>
 
-      {/* 챗봇 플로팅 버튼 */}
+      {/* 챗봇 버튼 */}
       {view === 'DASHBOARD' && (
         <button onClick={() => setIsChatOpen(!isChatOpen)} className="fixed bottom-6 right-6 z-50 bg-gradient-to-r from-red-600 to-orange-500 text-white font-bold px-5 py-3.5 rounded-full shadow-2xl flex items-center space-x-2.5">
           <span className="text-xl">🤖</span>
