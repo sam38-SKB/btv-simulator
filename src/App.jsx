@@ -18,6 +18,28 @@ import AdminPanel from './components/admin/AdminPanel';
 import ChatbotDrawer from './components/common/ChatbotDrawer';
 import ProposalModal from './components/common/ProposalModal';
 
+// 구형 데이터 호환 및 마이그레이션 헬퍼
+const sanitizeBonus = (raw) => {
+  if (!raw) return DEFAULT_BONUS_RULES;
+  if (Array.isArray(raw)) return { BTV: raw, ADDR3: DEFAULT_BONUS_RULES.ADDR3 };
+  if (!raw.BTV || !raw.ADDR3) return DEFAULT_BONUS_RULES;
+  return raw;
+};
+
+const sanitizeSurcharge = (raw) => {
+  if (!raw) return DEFAULT_SURCHARGE_RULES;
+  if (raw.region && !raw.BTV) return { BTV: raw, ADDR3: DEFAULT_SURCHARGE_RULES.ADDR3 };
+  if (!raw.BTV || !raw.ADDR3) return DEFAULT_SURCHARGE_RULES;
+  return raw;
+};
+
+const sanitizePromo = (raw) => {
+  if (!raw) return DEFAULT_PROMO_RULES;
+  if (Array.isArray(raw)) return { BTV: raw, ADDR3: DEFAULT_PROMO_RULES.ADDR3 };
+  if (!raw.BTV || !raw.ADDR3) return DEFAULT_PROMO_RULES;
+  return raw;
+};
+
 export default function App() {
   const { users, currentUser, login, signup, logout, updateUserStatus, deleteUser } = useAuth();
   const [view, setView] = useState('DASHBOARD');
@@ -25,10 +47,7 @@ export default function App() {
   const [bonusRules, setBonusRules] = useState(() => {
     try {
       const saved = localStorage.getItem('btv_bonus_rules');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed && (parsed.BTV?.length > 0 || parsed.ADDR3?.length > 0)) return parsed;
-      }
+      if (saved) return sanitizeBonus(JSON.parse(saved));
     } catch (e) {}
     return DEFAULT_BONUS_RULES;
   });
@@ -36,10 +55,7 @@ export default function App() {
   const [surchargeRules, setSurchargeRules] = useState(() => {
     try {
       const saved = localStorage.getItem('btv_surcharge_rules');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed && (parsed.BTV || parsed.ADDR3)) return parsed;
-      }
+      if (saved) return sanitizeSurcharge(JSON.parse(saved));
     } catch (e) {}
     return DEFAULT_SURCHARGE_RULES;
   });
@@ -47,10 +63,7 @@ export default function App() {
   const [promoRules, setPromoRules] = useState(() => {
     try {
       const saved = localStorage.getItem('btv_promo_rules');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed && (parsed.BTV?.length > 0 || parsed.ADDR3?.length > 0)) return parsed;
-      }
+      if (saved) return sanitizePromo(JSON.parse(saved));
     } catch (e) {}
     return DEFAULT_PROMO_RULES;
   });
@@ -97,7 +110,6 @@ export default function App() {
     });
   };
 
-  // 매체별 타겟팅 할증 동적 변경 핸들러
   const handleUpdateSurcharge = (platform, category, actionType, index, field, value) => {
     setSurchargeRules(prev => {
       const updated = { ...prev };
@@ -192,5 +204,3 @@ export default function App() {
     </div>
   );
 }
-
-// 페이지 반영 테스트 
