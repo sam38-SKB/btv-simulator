@@ -18,7 +18,6 @@ import AdminPanel from './components/admin/AdminPanel';
 import ChatbotDrawer from './components/common/ChatbotDrawer';
 import ProposalModal from './components/common/ProposalModal';
 
-// 구형 데이터 호환 및 마이그레이션 헬퍼
 const sanitizeBonus = (raw) => {
   if (!raw) return DEFAULT_BONUS_RULES;
   if (Array.isArray(raw)) return { BTV: raw, ADDR3: DEFAULT_BONUS_RULES.ADDR3 };
@@ -44,6 +43,15 @@ export default function App() {
   const { users, currentUser, login, signup, logout, updateUserStatus, deleteUser } = useAuth();
   const [view, setView] = useState('DASHBOARD');
   
+  const [proposals, setProposals] = useState(() => {
+    try {
+      const saved = localStorage.getItem('btv_proposals');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+
   const [bonusRules, setBonusRules] = useState(() => {
     try {
       const saved = localStorage.getItem('btv_bonus_rules');
@@ -67,6 +75,10 @@ export default function App() {
     } catch (e) {}
     return DEFAULT_PROMO_RULES;
   });
+
+  useEffect(() => {
+    localStorage.setItem('btv_proposals', JSON.stringify(proposals));
+  }, [proposals]);
 
   useEffect(() => {
     localStorage.setItem('btv_bonus_rules', JSON.stringify(bonusRules));
@@ -96,6 +108,20 @@ export default function App() {
     const res = signup(form);
     if (!res.success) alert(res.message);
     else { alert('회원가입 신청이 완료되었습니다. 관리자 승인 후 로그인해 주세요.'); setView('LOGIN'); }
+  };
+
+  const handleSubmitProposal = (newProposal) => {
+    setProposals(prev => [newProposal, ...prev]);
+  };
+
+  const handleUpdateProposalStatus = (id, newStatus) => {
+    setProposals(prev => prev.map(p => p.id === id ? { ...p, status: newStatus } : p));
+  };
+
+  const handleDeleteProposal = (id) => {
+    if (confirm('해당 청약 제출 내역을 삭제하시겠습니까?')) {
+      setProposals(prev => prev.filter(p => p.id !== id));
+    }
   };
 
   const handleUpdateBonus = (platform, actionType, index, field, value) => {
@@ -165,6 +191,7 @@ export default function App() {
         {view === 'ADMIN' ? (
           <AdminPanel
             users={users}
+            proposals={proposals}
             bonusRules={bonusRules}
             surchargeRules={surchargeRules}
             promoRules={promoRules}
@@ -173,6 +200,8 @@ export default function App() {
             onUpdatePromo={handleUpdatePromo}
             onStatusChange={updateUserStatus}
             onDeleteUser={deleteUser}
+            onUpdateProposalStatus={handleUpdateProposalStatus}
+            onDeleteProposal={handleDeleteProposal}
             onBackToDashboard={() => setView('DASHBOARD')}
             onResetBonusRules={handleResetBonusRules}
             onResetSurchargeRules={handleResetSurchargeRules}
@@ -200,7 +229,7 @@ export default function App() {
       )}
 
       <ChatbotDrawer isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} onApplyRecommendation={(rec) => { actions.setPlatformMode(rec.platformMode); actions.setProductMode(rec.productMode); actions.setVideoLength(rec.videoLength); alert('추천 조건이 적용되었습니다!'); }} />
-      <ProposalModal isOpen={isProposalOpen} onClose={() => setIsProposalOpen(false)} state={state} calculation={calculation} audienceFormula={audienceFormula} currentUser={currentUser} />
+      <ProposalModal isOpen={isProposalOpen} onClose={() => setIsProposalOpen(false)} state={state} calculation={calculation} audienceFormula={audienceFormula} currentUser={currentUser} onSubmitProposal={handleSubmitProposal} />
     </div>
   );
 }
