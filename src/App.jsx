@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from './hooks/useAuth';
 import { useSimulator } from './hooks/useSimulator';
 import { DEFAULT_BONUS_RULES, DEFAULT_SURCHARGE_RULES, DEFAULT_PROMO_RULES } from './constants/defaultRules';
@@ -22,9 +22,51 @@ export default function App() {
   const { users, currentUser, login, signup, logout, updateUserStatus, deleteUser } = useAuth();
   const [view, setView] = useState('DASHBOARD');
   
-  const [bonusRules, setBonusRules] = useState(DEFAULT_BONUS_RULES);
-  const [surchargeRules, setSurchargeRules] = useState(DEFAULT_SURCHARGE_RULES);
-  const [promoRules, setPromoRules] = useState(DEFAULT_PROMO_RULES);
+  // LocalStorage 읽기 오류 예방 검증 로직 적용
+  const [bonusRules, setBonusRules] = useState(() => {
+    try {
+      const saved = localStorage.getItem('btv_bonus_rules');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && (parsed.BTV?.length > 0 || parsed.ADDR3?.length > 0)) return parsed;
+      }
+    } catch (e) {}
+    return DEFAULT_BONUS_RULES;
+  });
+
+  const [surchargeRules, setSurchargeRules] = useState(() => {
+    try {
+      const saved = localStorage.getItem('btv_surcharge_rules');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && (parsed.region?.length > 0 || parsed.time?.length > 0)) return parsed;
+      }
+    } catch (e) {}
+    return DEFAULT_SURCHARGE_RULES;
+  });
+
+  const [promoRules, setPromoRules] = useState(() => {
+    try {
+      const saved = localStorage.getItem('btv_promo_rules');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && (parsed.BTV?.length > 0 || parsed.ADDR3?.length > 0)) return parsed;
+      }
+    } catch (e) {}
+    return DEFAULT_PROMO_RULES;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('btv_bonus_rules', JSON.stringify(bonusRules));
+  }, [bonusRules]);
+
+  useEffect(() => {
+    localStorage.setItem('btv_surcharge_rules', JSON.stringify(surchargeRules));
+  }, [surchargeRules]);
+
+  useEffect(() => {
+    localStorage.setItem('btv_promo_rules', JSON.stringify(promoRules));
+  }, [promoRules]);
 
   const simulator = useSimulator(bonusRules, surchargeRules, promoRules);
   const { state, actions, volInfo, audienceFormula, calculation } = simulator;
@@ -44,7 +86,7 @@ export default function App() {
     else { alert('회원가입 신청이 완료되었습니다. 관리자 승인 후 로그인해 주세요.'); setView('LOGIN'); }
   };
 
-  // 볼륨 보너스 동적 변경 핸들러 (추가)
+  // 볼륨 보너스 동적 변경 핸들러
   const handleUpdateBonus = (platform, actionType, index, field, value) => {
     setBonusRules(prev => {
       const updated = { ...prev };
@@ -83,6 +125,21 @@ export default function App() {
     });
   };
 
+  const handleResetBonusRules = () => {
+    localStorage.removeItem('btv_bonus_rules');
+    setBonusRules(DEFAULT_BONUS_RULES);
+  };
+
+  const handleResetSurchargeRules = () => {
+    localStorage.removeItem('btv_surcharge_rules');
+    setSurchargeRules(DEFAULT_SURCHARGE_RULES);
+  };
+
+  const handleResetPromoRules = () => {
+    localStorage.removeItem('btv_promo_rules');
+    setPromoRules(DEFAULT_PROMO_RULES);
+  };
+
   if (!currentUser) {
     return view === 'SIGNUP' ? <SignupView onSignup={handleSignup} onCancel={() => setView('LOGIN')} /> : <LoginView onLogin={handleLogin} onGoSignup={() => setView('SIGNUP')} />;
   }
@@ -104,9 +161,9 @@ export default function App() {
             onStatusChange={updateUserStatus}
             onDeleteUser={deleteUser}
             onBackToDashboard={() => setView('DASHBOARD')}
-            onResetBonusRules={() => setBonusRules(DEFAULT_BONUS_RULES)}
-            onResetSurchargeRules={() => setSurchargeRules(DEFAULT_SURCHARGE_RULES)}
-            onResetPromoRules={() => setPromoRules(DEFAULT_PROMO_RULES)}
+            onResetBonusRules={handleResetBonusRules}
+            onResetSurchargeRules={handleResetSurchargeRules}
+            onResetPromoRules={handleResetPromoRules}
           />
         ) : (
           <>

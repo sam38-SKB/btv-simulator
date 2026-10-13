@@ -1,10 +1,11 @@
 import React from 'react';
+import { DEFAULT_BONUS_RULES, DEFAULT_SURCHARGE_RULES, DEFAULT_PROMO_RULES } from '../../constants/defaultRules';
 
 export default function AdminPanel({ 
-  users, 
-  bonusRules, 
-  surchargeRules, 
-  promoRules, 
+  users = [], 
+  bonusRules = {}, 
+  surchargeRules = {}, 
+  promoRules = {}, 
   onUpdateBonus,
   onUpdateSurcharge, 
   onUpdatePromo, 
@@ -15,6 +16,22 @@ export default function AdminPanel({
   onResetSurchargeRules, 
   onResetPromoRules 
 }) {
+  // 데이터가 비어있을 경우 기본 UI 폼이 무조건 출력되도록 안전 구문 처리
+  const btvBonus = (bonusRules.BTV && bonusRules.BTV.length > 0) ? bonusRules.BTV : DEFAULT_BONUS_RULES.BTV;
+  const addr3Bonus = (bonusRules.ADDR3 && bonusRules.ADDR3.length > 0) ? bonusRules.ADDR3 : DEFAULT_BONUS_RULES.ADDR3;
+  const currentBonusRules = { BTV: btvBonus, ADDR3: addr3Bonus };
+
+  const currentSurchargeRules = {
+    region: (surchargeRules.region && surchargeRules.region.length > 0) ? surchargeRules.region : DEFAULT_SURCHARGE_RULES.region,
+    time: (surchargeRules.time && surchargeRules.time.length > 0) ? surchargeRules.time : DEFAULT_SURCHARGE_RULES.time,
+    channel: (surchargeRules.channel && surchargeRules.channel.length > 0) ? surchargeRules.channel : DEFAULT_SURCHARGE_RULES.channel
+  };
+
+  const currentPromoRules = {
+    BTV: (promoRules.BTV && promoRules.BTV.length > 0) ? promoRules.BTV : DEFAULT_PROMO_RULES.BTV,
+    ADDR3: (promoRules.ADDR3 && promoRules.ADDR3.length > 0) ? promoRules.ADDR3 : DEFAULT_PROMO_RULES.ADDR3
+  };
+
   const surchargeCategoryNames = {
     region: '📍 지역 타겟팅 할증',
     time: '⏰ 시간대 타겟팅 할증',
@@ -23,7 +40,7 @@ export default function AdminPanel({
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
-      {/* 상단 헤더 */}
+      {/* 헤더 */}
       <div className="bg-gradient-to-r from-purple-900/60 to-slate-800 border border-purple-700 p-6 rounded-2xl shadow-xl flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-black text-purple-200">🛡️ B tv Agent 시스템 관리자 페이지</h2>
@@ -31,7 +48,7 @@ export default function AdminPanel({
             사용자 가입 승인, 볼륨 보너스 요율, 타겟팅 할증 요율, 프로모션 정책을 통제합니다.
           </p>
         </div>
-        <button onClick={onBackToDashboard} className="bg-purple-600 hover:bg-purple-500 text-white px-5 py-2.5 rounded-xl font-bold text-sm">
+        <button onClick={onBackToDashboard} className="bg-purple-600 hover:bg-purple-500 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-lg">
           📊 시뮬레이터로 이동
         </button>
       </div>
@@ -52,72 +69,81 @@ export default function AdminPanel({
         </div>
       </div>
 
-      {/* 📊 [월 집행 금액 & 집행 기간] 볼륨 보너스 요율 관리 (복원 추가) */}
+      {/* 📊 [월 집행 금액 & 집행 기간] 볼륨 보너스 구간 관리 UI */}
       <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-2xl space-y-5">
         <div className="flex justify-between items-center border-b border-slate-700 pb-3">
           <h3 className="text-lg font-bold text-white flex items-center">
-            <span className="text-amber-400 mr-2">📊</span> [월 집행 금액 & 집행 기간] 볼륨 보너스 구간 관리
+            <span className="text-amber-400 mr-2">📊</span> [월 집행 금액 & 집행 기간] 볼륨 보너스 구간 설정 UI
           </h3>
-          <button onClick={onResetBonusRules} className="bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-600">
-            🔄 보너스 구간 초기화
+          <button onClick={onResetBonusRules} className="bg-red-900/60 hover:bg-red-800 text-red-200 text-xs font-bold px-3 py-1.5 rounded-lg border border-red-700">
+            🔄 보너스 구간 기본값 초기화
           </button>
         </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {['BTV', 'ADDR3'].map(platform => (
             <div key={platform} className="bg-slate-900 border border-slate-700 p-4 rounded-xl space-y-3 text-xs">
               <div className="flex justify-between items-center border-b border-slate-800 pb-2">
-                <span className="font-bold text-amber-400">
-                  {platform === 'BTV' ? '📺 B tv 단독 볼륨 보너스' : '🌐 IPTV 3사 PRIME 볼륨 보너스'}
+                <span className="font-bold text-amber-400 text-sm">
+                  {platform === 'BTV' ? '📺 B tv 단독 볼륨 보너스 구간' : '🌐 IPTV 3사 PRIME 볼륨 보너스 구간'}
                 </span>
-                <button onClick={() => onUpdateBonus(platform, 'ADD')} className="bg-slate-800 hover:bg-slate-700 text-white px-2.5 py-1 rounded font-bold">
+                <button 
+                  onClick={() => onUpdateBonus(platform, 'ADD')} 
+                  className="bg-amber-600 hover:bg-amber-500 text-white px-3 py-1 rounded-lg font-bold text-xs shadow"
+                >
                   + 구간 추가
                 </button>
               </div>
-              {(bonusRules[platform] || []).map((rule, idx) => (
-                <div key={idx} className="bg-slate-800 p-3 rounded-lg border border-slate-700 space-y-2">
-                  <div className="flex items-center justify-between text-slate-300">
-                    <span className="font-bold text-slate-200">구간 {idx + 1}</span>
-                    <button onClick={() => onUpdateBonus(platform, 'DELETE', idx)} className="text-red-400 font-bold px-1 hover:text-red-300">
+
+              {currentBonusRules[platform].map((rule, idx) => (
+                <div key={idx} className="bg-slate-800 p-3.5 rounded-xl border border-slate-700 space-y-2.5 shadow-md">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-200 text-xs">구간 {idx + 1} 조건 설정</span>
+                    <button 
+                      onClick={() => onUpdateBonus(platform, 'DELETE', idx)} 
+                      className="text-red-400 font-bold text-xs hover:text-red-300 bg-slate-900 px-2 py-0.5 rounded border border-slate-700"
+                    >
                       ✕ 삭제
                     </button>
                   </div>
-                  <div className="grid grid-cols-3 gap-2 text-slate-400">
+                  <div className="grid grid-cols-3 gap-2 text-slate-300">
                     <div>
-                      <label className="block text-[11px] mb-1">최소 월예산</label>
+                      <label className="block text-[11px] text-slate-400 font-bold mb-1">최소 월예산</label>
                       <div className="flex items-center space-x-1">
                         <input 
                           type="number" 
-                          step={1000} 
+                          step={500} 
                           value={rule.minMonthlyBudget ? rule.minMonthlyBudget / 10000 : 0} 
                           onChange={(e) => onUpdateBonus(platform, 'CHANGE', idx, 'minMonthlyBudget', Number(e.target.value) * 10000)} 
-                          className="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1 text-right font-bold text-white text-xs" 
+                          className="w-full bg-slate-900 border border-slate-600 rounded-lg px-2.5 py-1.5 text-right font-bold text-white text-xs" 
                         />
-                        <span className="text-[11px] whitespace-nowrap">만원</span>
+                        <span className="text-[11px] text-slate-400 font-bold whitespace-nowrap">만원</span>
                       </div>
                     </div>
                     <div>
-                      <label className="block text-[11px] mb-1">최소 기간</label>
+                      <label className="block text-[11px] text-slate-400 font-bold mb-1">최소 기간</label>
                       <div className="flex items-center space-x-1">
-                        <input 
-                          type="number" 
-                          min={1} 
-                          max={12} 
-                          value={rule.minMonths || 1} 
-                          onChange={(e) => onUpdateBonus(platform, 'CHANGE', idx, 'minMonths', Number(e.target.value))} 
-                          className="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1 text-right font-bold text-white text-xs" 
-                        />
-                        <span className="text-[11px] whitespace-nowrap">개월</span>
+                        <select
+                          value={rule.minMonths || 1}
+                          onChange={(e) => onUpdateBonus(platform, 'CHANGE', idx, 'minMonths', Number(e.target.value))}
+                          className="w-full bg-slate-900 border border-slate-600 rounded-lg px-2 py-1.5 font-bold text-white text-xs"
+                        >
+                          <option value={1}>1개월</option>
+                          <option value={2}>2개월</option>
+                          <option value={3}>3개월</option>
+                          <option value={6}>6개월</option>
+                        </select>
                       </div>
                     </div>
                     <div>
-                      <label className="block text-[11px] mb-1">보너스율</label>
+                      <label className="block text-[11px] text-slate-400 font-bold mb-1">보너스율</label>
                       <div className="flex items-center space-x-1">
                         <input 
                           type="number" 
                           step={5} 
                           value={rule.rate || 0} 
                           onChange={(e) => onUpdateBonus(platform, 'CHANGE', idx, 'rate', Number(e.target.value))} 
-                          className="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1 text-right font-bold text-emerald-400 text-xs" 
+                          className="w-full bg-slate-900 border border-slate-600 rounded-lg px-2 py-1.5 text-right font-bold text-emerald-400 text-xs" 
                         />
                         <span className="text-[11px] font-bold text-emerald-400">%</span>
                       </div>
@@ -149,7 +175,7 @@ export default function AdminPanel({
                   + 항목 추가
                 </button>
               </div>
-              {(surchargeRules[cat] || []).map((rule, idx) => (
+              {currentSurchargeRules[cat].map((rule, idx) => (
                 <div key={rule.id || idx} className="bg-slate-800 p-3 rounded-lg border border-slate-700 space-y-2">
                   <div className="flex items-center space-x-2">
                     <input 
@@ -205,7 +231,7 @@ export default function AdminPanel({
                   + 추가
                 </button>
               </div>
-              {(promoRules[platform] || []).map((rule, idx) => (
+              {currentPromoRules[platform].map((rule, idx) => (
                 <div key={rule.id || idx} className="bg-slate-800 p-3 rounded-lg border border-slate-700 space-y-2">
                   <div className="flex items-center space-x-2">
                     <input 
