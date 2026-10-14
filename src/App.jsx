@@ -25,15 +25,15 @@ export default function App() {
   const { users, currentUser, login, signup, logout, updateUserStatus, deleteUser } = useAuth();
   const [view, setView] = useState('DASHBOARD');
   
-  // DB 상태
+  // Firebase DB 연동 상태
   const [proposals, setProposals] = useState([]);
   const [bonusRules, setBonusRules] = useState(DEFAULT_BONUS_RULES);
   const [surchargeRules, setSurchargeRules] = useState(DEFAULT_SURCHARGE_RULES);
   const [promoRules, setPromoRules] = useState(DEFAULT_PROMO_RULES);
 
-  // 1. Firebase 실시간 데이터 동기화 (전체 단말 공통)
+  // 1. Firebase Firestore 실시간 데이터 동기화 (전체 단말 공통)
   useEffect(() => {
-    // 정책 설정 동기화
+    // 정책 설정 (보너스, 할증, 프로모션) 실시간 수신
     const unsubRules = onSnapshot(doc(db, 'settings', 'rules'), (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
@@ -41,7 +41,7 @@ export default function App() {
         if (data.surchargeRules) setSurchargeRules(data.surchargeRules);
         if (data.promoRules) setPromoRules(data.promoRules);
       } else {
-        // 최초 접속 시 기본값 저장
+        // DB에 문서가 없는 최초 접속 시 기본값 자동 저장
         setDoc(doc(db, 'settings', 'rules'), {
           bonusRules: DEFAULT_BONUS_RULES,
           surchargeRules: DEFAULT_SURCHARGE_RULES,
@@ -50,7 +50,7 @@ export default function App() {
       }
     });
 
-    // 청약 내역 실시간 동기화
+    // 제출된 청약/견적서 내역 실시간 수신
     const unsubProps = onSnapshot(collection(db, 'proposals'), (snapshot) => {
       const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
       list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
@@ -63,12 +63,16 @@ export default function App() {
     };
   }, []);
 
-  // DB에 정책 업데이트 저장하는 헬퍼 함수
-  const saveRulesToDB = async (newBonus, newSurcharge, newPromo) => {
+  // 2. 관리자 페이지에서 [💾 DB에 정책 저장하기] 클릭 시 일괄 업데이트
+  const handleSaveRules = async (newBonus, newSurcharge, newPromo) => {
+    setBonusRules(newBonus);
+    setSurchargeRules(newSurcharge);
+    setPromoRules(newPromo);
+
     await setDoc(doc(db, 'settings', 'rules'), {
-      bonusRules: newBonus || bonusRules,
-      surchargeRules: newSurcharge || surchargeRules,
-      promoRules: newPromo || promoRules
+      bonusRules: newBonus,
+      surchargeRules: newSurcharge,
+      promoRules: newPromo
     });
   };
 
@@ -95,7 +99,7 @@ export default function App() {
     await setDoc(doc(db, 'proposals', newProposal.id), newProposal);
   };
 
-  // 청약 상태 변경 ➔ DB 업데이트
+  // 청약 상태 변경 (승인/반려) ➔ DB 업데이트
   const handleUpdateProposalStatus = async (id, newStatus) => {
     const target = proposals.find(p => p.id === id);
     if (target) {
@@ -110,55 +114,12 @@ export default function App() {
     }
   };
 
-  // 보너스 요율 수정
-  const handleUpdateBonus = (platform, actionType, index, field, value) => {
-    const updated = { ...bonusRules };
-    const list = [...(updated[platform] || [])];
-    if (actionType === 'ADD') list.push({ minMonthlyBudget: 10000000, minMonths: 1, rate: 10 });
-    else if (actionType === 'DELETE') list.splice(index, 1);
-    else if (actionType === 'CHANGE') list[index] = { ...list[index], [field]: value };
-    updated[platform] = list;
-
-    setBonusRules(updated);
-    saveRulesToDB(updated, surchargeRules, promoRules);
-  };
-
-  // 할증 요율 수정
-  const handleUpdateSurcharge = (platform, category, actionType, index, field, value) => {
-    const updated = { ...surchargeRules };
-    const platformObj = { ...(updated[platform] || DEFAULT_SURCHARGE_RULES[platform]) };
-    const list = [...(platformObj[category] || [])];
-
-    if (actionType === 'ADD') list.push({ id: `S_${Date.now()}`, name: '신규 할증 조건', rate: 10 });
-    else if (actionType === 'DELETE') list.splice(index, 1);
-    else if (actionType === 'CHANGE') list[index] = { ...list[index], [field]: value };
-
-    platformObj[category] = list;
-    updated[platform] = platformObj;
-
-    setSurchargeRules(updated);
-    saveRulesToDB(bonusRules, updated, promoRules);
-  };
-
-  // 프로모션 수정
-  const handleUpdatePromo = (platform, actionType, index, field, value) => {
-    const updated = { ...promoRules };
-    const list = [...(updated[platform] || [])];
-    if (actionType === 'ADD') list.push({ id: `${platform}_${Date.now()}`, name: '신규 프로모션', desc: '설명 입력', rate: 10, type: 'RATE' });
-    else if (actionType === 'DELETE') list.splice(index, 1);
-    else if (actionType === 'CHANGE') list[index] = { ...list[index], [field]: value };
-    updated[platform] = list;
-
-    setPromoRules(updated);
-    saveRulesToDB(bonusRules, surchargeRules, updated);
-  };
-
-  const handleResetBonusRules = () => { saveRulesToDB(DEFAULT_BONUS_RULES, surchargeRules, promoRules); };
-  const handleResetSurchargeRules = () => { saveRulesToDB(bonusRules, DEFAULT_SURCHARGE_RULES, promoRules); };
-  const handleResetPromoRules = () => { saveRulesToDB(bonusRules, surchargeRules, DEFAULT_PROMO_RULES); };
-
   if (!currentUser) {
-    return view === 'SIGNUP' ? <SignupView onSignup={handleSignup} onCancel={() => setView('LOGIN')} /> : <LoginView onLogin={handleLogin} onGoSignup={() => setView('SIGNUP')} />;
+    return view === 'SIGNUP' ? (
+      <SignupView onSignup={handleSignup} onCancel={() => setView('LOGIN')} />
+    ) : (
+      <LoginView onLogin={handleLogin} onGoSignup={() => setView('SIGNUP')} />
+    );
   }
 
   return (
@@ -173,17 +134,12 @@ export default function App() {
             bonusRules={bonusRules}
             surchargeRules={surchargeRules}
             promoRules={promoRules}
-            onUpdateBonus={handleUpdateBonus}
-            onUpdateSurcharge={handleUpdateSurcharge}
-            onUpdatePromo={handleUpdatePromo}
+            onSaveRules={handleSaveRules}
             onStatusChange={updateUserStatus}
             onDeleteUser={deleteUser}
             onUpdateProposalStatus={handleUpdateProposalStatus}
             onDeleteProposal={handleDeleteProposal}
             onBackToDashboard={() => setView('DASHBOARD')}
-            onResetBonusRules={handleResetBonusRules}
-            onResetSurchargeRules={handleResetSurchargeRules}
-            onResetPromoRules={handleResetPromoRules}
           />
         ) : (
           <>
