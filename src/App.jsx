@@ -1,4 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { doc, collection, onSnapshot, setDoc, deleteDoc } from 'firebase/firestore';
+import { db } from './lib/firebase';
+
 import { useAuth } from './hooks/useAuth';
 import { useSimulator } from './hooks/useSimulator';
 import { DEFAULT_BONUS_RULES, DEFAULT_SURCHARGE_RULES, DEFAULT_PROMO_RULES } from './constants/defaultRules';
@@ -18,79 +21,56 @@ import AdminPanel from './components/admin/AdminPanel';
 import ChatbotDrawer from './components/common/ChatbotDrawer';
 import ProposalModal from './components/common/ProposalModal';
 
-const sanitizeBonus = (raw) => {
-  if (!raw) return DEFAULT_BONUS_RULES;
-  if (Array.isArray(raw)) return { BTV: raw, ADDR3: DEFAULT_BONUS_RULES.ADDR3 };
-  if (!raw.BTV || !raw.ADDR3) return DEFAULT_BONUS_RULES;
-  return raw;
-};
-
-const sanitizeSurcharge = (raw) => {
-  if (!raw) return DEFAULT_SURCHARGE_RULES;
-  if (raw.region && !raw.BTV) return { BTV: raw, ADDR3: DEFAULT_SURCHARGE_RULES.ADDR3 };
-  if (!raw.BTV || !raw.ADDR3) return DEFAULT_SURCHARGE_RULES;
-  return raw;
-};
-
-const sanitizePromo = (raw) => {
-  if (!raw) return DEFAULT_PROMO_RULES;
-  if (Array.isArray(raw)) return { BTV: raw, ADDR3: DEFAULT_PROMO_RULES.ADDR3 };
-  if (!raw.BTV || !raw.ADDR3) return DEFAULT_PROMO_RULES;
-  return raw;
-};
-
 export default function App() {
   const { users, currentUser, login, signup, logout, updateUserStatus, deleteUser } = useAuth();
   const [view, setView] = useState('DASHBOARD');
   
-  const [proposals, setProposals] = useState(() => {
-    try {
-      const saved = localStorage.getItem('btv_proposals');
-      return saved ? JSON.parse(saved) : [];
-    } catch (e) {
-      return [];
-    }
-  });
+  // DB 상태
+  const [proposals, setProposals] = useState([]);
+  const [bonusRules, setBonusRules] = useState(DEFAULT_BONUS_RULES);
+  const [surchargeRules, setSurchargeRules] = useState(DEFAULT_SURCHARGE_RULES);
+  const [promoRules, setPromoRules] = useState(DEFAULT_PROMO_RULES);
 
-  const [bonusRules, setBonusRules] = useState(() => {
-    try {
-      const saved = localStorage.getItem('btv_bonus_rules');
-      if (saved) return sanitizeBonus(JSON.parse(saved));
-    } catch (e) {}
-    return DEFAULT_BONUS_RULES;
-  });
-
-  const [surchargeRules, setSurchargeRules] = useState(() => {
-    try {
-      const saved = localStorage.getItem('btv_surcharge_rules');
-      if (saved) return sanitizeSurcharge(JSON.parse(saved));
-    } catch (e) {}
-    return DEFAULT_SURCHARGE_RULES;
-  });
-
-  const [promoRules, setPromoRules] = useState(() => {
-    try {
-      const saved = localStorage.getItem('btv_promo_rules');
-      if (saved) return sanitizePromo(JSON.parse(saved));
-    } catch (e) {}
-    return DEFAULT_PROMO_RULES;
-  });
-
+  // 1. Firebase 실시간 데이터 동기화 (전체 단말 공통)
   useEffect(() => {
-    localStorage.setItem('btv_proposals', JSON.stringify(proposals));
-  }, [proposals]);
+    // 정책 설정 동기화
+    const unsubRules = onSnapshot(doc(db, 'settings', 'rules'), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (data.bonusRules) setBonusRules(data.bonusRules);
+        if (data.surchargeRules) setSurchargeRules(data.surchargeRules);
+        if (data.promoRules) setPromoRules(data.promoRules);
+      } else {
+        // 최초 접속 시 기본값 저장
+        setDoc(doc(db, 'settings', 'rules'), {
+          bonusRules: DEFAULT_BONUS_RULES,
+          surchargeRules: DEFAULT_SURCHARGE_RULES,
+          promoRules: DEFAULT_PROMO_RULES
+        });
+      }
+    });
 
-  useEffect(() => {
-    localStorage.setItem('btv_bonus_rules', JSON.stringify(bonusRules));
-  }, [bonusRules]);
+    // 청약 내역 실시간 동기화
+    const unsubProps = onSnapshot(collection(db, 'proposals'), (snapshot) => {
+      const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      setProposals(list);
+    });
 
-  useEffect(() => {
-    localStorage.setItem('btv_surcharge_rules', JSON.stringify(surchargeRules));
-  }, [surchargeRules]);
+    return () => {
+      unsubRules();
+      unsubProps();
+    };
+  }, []);
 
-  useEffect(() => {
-    localStorage.setItem('btv_promo_rules', JSON.stringify(promoRules));
-  }, [promoRules]);
+  // DB에 정책 업데이트 저장하는 헬퍼 함수
+  const saveRulesToDB = async (newBonus, newSurcharge, newPromo) => {
+    await setDoc(doc(db, 'settings', 'rules'), {
+      bonusRules: newBonus || bonusRules,
+      surchargeRules: newSurcharge || surchargeRules,
+      promoRules: newPromo || promoRules
+    });
+  };
 
   const simulator = useSimulator(bonusRules, surchargeRules, promoRules);
   const { state, actions, volInfo, audienceFormula, calculation } = simulator;
@@ -110,74 +90,72 @@ export default function App() {
     else { alert('회원가입 신청이 완료되었습니다. 관리자 승인 후 로그인해 주세요.'); setView('LOGIN'); }
   };
 
-  const handleSubmitProposal = (newProposal) => {
-    setProposals(prev => [newProposal, ...prev]);
+  // 청약 제출 ➔ DB 저장
+  const handleSubmitProposal = async (newProposal) => {
+    await setDoc(doc(db, 'proposals', newProposal.id), newProposal);
   };
 
-  const handleUpdateProposalStatus = (id, newStatus) => {
-    setProposals(prev => prev.map(p => p.id === id ? { ...p, status: newStatus } : p));
-  };
-
-  const handleDeleteProposal = (id) => {
-    if (confirm('해당 청약 제출 내역을 삭제하시겠습니까?')) {
-      setProposals(prev => prev.filter(p => p.id !== id));
+  // 청약 상태 변경 ➔ DB 업데이트
+  const handleUpdateProposalStatus = async (id, newStatus) => {
+    const target = proposals.find(p => p.id === id);
+    if (target) {
+      await setDoc(doc(db, 'proposals', id), { ...target, status: newStatus });
     }
   };
 
+  // 청약 삭제 ➔ DB 삭제
+  const handleDeleteProposal = async (id) => {
+    if (confirm('해당 청약 제출 내역을 삭제하시겠습니까?')) {
+      await deleteDoc(doc(db, 'proposals', id));
+    }
+  };
+
+  // 보너스 요율 수정
   const handleUpdateBonus = (platform, actionType, index, field, value) => {
-    setBonusRules(prev => {
-      const updated = { ...prev };
-      const list = [...(updated[platform] || [])];
-      if (actionType === 'ADD') list.push({ minMonthlyBudget: 10000000, minMonths: 1, rate: 10 });
-      else if (actionType === 'DELETE') list.splice(index, 1);
-      else if (actionType === 'CHANGE') list[index] = { ...list[index], [field]: value };
-      updated[platform] = list;
-      return updated;
-    });
+    const updated = { ...bonusRules };
+    const list = [...(updated[platform] || [])];
+    if (actionType === 'ADD') list.push({ minMonthlyBudget: 10000000, minMonths: 1, rate: 10 });
+    else if (actionType === 'DELETE') list.splice(index, 1);
+    else if (actionType === 'CHANGE') list[index] = { ...list[index], [field]: value };
+    updated[platform] = list;
+
+    setBonusRules(updated);
+    saveRulesToDB(updated, surchargeRules, promoRules);
   };
 
+  // 할증 요율 수정
   const handleUpdateSurcharge = (platform, category, actionType, index, field, value) => {
-    setSurchargeRules(prev => {
-      const updated = { ...prev };
-      const platformObj = { ...(updated[platform] || DEFAULT_SURCHARGE_RULES[platform]) };
-      const list = [...(platformObj[category] || [])];
+    const updated = { ...surchargeRules };
+    const platformObj = { ...(updated[platform] || DEFAULT_SURCHARGE_RULES[platform]) };
+    const list = [...(platformObj[category] || [])];
 
-      if (actionType === 'ADD') list.push({ id: `S_${Date.now()}`, name: '신규 할증 조건', rate: 10 });
-      else if (actionType === 'DELETE') list.splice(index, 1);
-      else if (actionType === 'CHANGE') list[index] = { ...list[index], [field]: value };
+    if (actionType === 'ADD') list.push({ id: `S_${Date.now()}`, name: '신규 할증 조건', rate: 10 });
+    else if (actionType === 'DELETE') list.splice(index, 1);
+    else if (actionType === 'CHANGE') list[index] = { ...list[index], [field]: value };
 
-      platformObj[category] = list;
-      updated[platform] = platformObj;
-      return updated;
-    });
+    platformObj[category] = list;
+    updated[platform] = platformObj;
+
+    setSurchargeRules(updated);
+    saveRulesToDB(bonusRules, updated, promoRules);
   };
 
+  // 프로모션 수정
   const handleUpdatePromo = (platform, actionType, index, field, value) => {
-    setPromoRules(prev => {
-      const updated = { ...prev };
-      const list = [...(updated[platform] || [])];
-      if (actionType === 'ADD') list.push({ id: `${platform}_${Date.now()}`, name: '신규 프로모션', desc: '설명 입력', rate: 10, type: 'RATE' });
-      else if (actionType === 'DELETE') list.splice(index, 1);
-      else if (actionType === 'CHANGE') list[index] = { ...list[index], [field]: value };
-      updated[platform] = list;
-      return updated;
-    });
+    const updated = { ...promoRules };
+    const list = [...(updated[platform] || [])];
+    if (actionType === 'ADD') list.push({ id: `${platform}_${Date.now()}`, name: '신규 프로모션', desc: '설명 입력', rate: 10, type: 'RATE' });
+    else if (actionType === 'DELETE') list.splice(index, 1);
+    else if (actionType === 'CHANGE') list[index] = { ...list[index], [field]: value };
+    updated[platform] = list;
+
+    setPromoRules(updated);
+    saveRulesToDB(bonusRules, surchargeRules, updated);
   };
 
-  const handleResetBonusRules = () => {
-    localStorage.removeItem('btv_bonus_rules');
-    setBonusRules(DEFAULT_BONUS_RULES);
-  };
-
-  const handleResetSurchargeRules = () => {
-    localStorage.removeItem('btv_surcharge_rules');
-    setSurchargeRules(DEFAULT_SURCHARGE_RULES);
-  };
-
-  const handleResetPromoRules = () => {
-    localStorage.removeItem('btv_promo_rules');
-    setPromoRules(DEFAULT_PROMO_RULES);
-  };
+  const handleResetBonusRules = () => { saveRulesToDB(DEFAULT_BONUS_RULES, surchargeRules, promoRules); };
+  const handleResetSurchargeRules = () => { saveRulesToDB(bonusRules, DEFAULT_SURCHARGE_RULES, promoRules); };
+  const handleResetPromoRules = () => { saveRulesToDB(bonusRules, surchargeRules, DEFAULT_PROMO_RULES); };
 
   if (!currentUser) {
     return view === 'SIGNUP' ? <SignupView onSignup={handleSignup} onCancel={() => setView('LOGIN')} /> : <LoginView onLogin={handleLogin} onGoSignup={() => setView('SIGNUP')} />;
