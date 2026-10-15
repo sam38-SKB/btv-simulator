@@ -3,15 +3,14 @@ import React from 'react';
 export default function StepIndicator({ currentStep, goToStep, currentTab }) {
   const steps = [
     { num: 1, label: '예산 및 기간' },
-    { num: 2, label: '플랫폼 & 소재' },
-    { num: 3, label: '상품 & 보너스' },
-    { num: 4, label: '타겟팅 설정' },
-    { num: 5, label: '최종 견적' },
+    { num: 2, label: '상품 & 보너스' },
+    { num: 3, label: '타겟팅 설정' },
+    { num: 4, label: '최종 견적' },
   ];
 
   const isBtv = currentTab === 'BTV';
 
-  // 테마별 액센트 스타일 정의
+  // 테마별 액센트 스타일
   const activeBg = isBtv
     ? 'bg-gradient-to-r from-amber-400 to-orange-500 text-slate-950 font-black shadow-lg shadow-amber-500/30 ring-2 ring-amber-300'
     : 'bg-gradient-to-r from-sky-400 to-blue-500 text-slate-950 font-black shadow-lg shadow-sky-500/30 ring-2 ring-sky-300';
@@ -38,12 +37,12 @@ export default function StepIndicator({ currentStep, goToStep, currentTab }) {
           </span>
         </div>
         <div className="text-xs font-mono font-semibold text-slate-400">
-          STEP <span className={isBtv ? 'text-amber-400 font-extrabold text-sm' : 'text-sky-400 font-extrabold text-sm'}>{currentStep}</span> / 5
+          STEP <span className={isBtv ? 'text-amber-400 font-extrabold text-sm' : 'text-sky-400 font-extrabold text-sm'}>{currentStep}</span> / 4
         </div>
       </div>
 
-      {/* 스텝 서클 네비게이션 */}
-      <div className="grid grid-cols-5 gap-2 relative">
+      {/* 4단계 스텝 서클 네비게이션 */}
+      <div className="grid grid-cols-4 gap-3 relative">
         {steps.map((step) => {
           const isActive = currentStep === step.num;
           const isPassed = currentStep > step.num;

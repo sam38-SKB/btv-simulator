@@ -12,7 +12,6 @@ import LoginView from './components/auth/LoginView';
 import SignupView from './components/auth/SignupView';
 
 import Step1Budget from './components/steps/Step1Budget';
-import Step2Platform from './components/steps/Step2Platform';
 import Step3Package from './components/steps/Step3Package';
 import Step4Audience from './components/steps/Step4Audience';
 import Step5Estimate from './components/steps/Step5Estimate';
@@ -78,9 +77,10 @@ export default function App() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isProposalOpen, setIsProposalOpen] = useState(false);
 
-  // GNB 메뉴 선택 시 모드 자동 스위칭
+  // GNB 메뉴 선택 시 플랫폼 모드 자동 지정 및 1단계 이동
   const handleSelectTab = (tab) => {
     setCurrentTab(tab);
+    actions.setCurrentStep(1);
     if (tab === 'BTV') {
       actions.setPlatformMode('BTV');
     } else if (tab === 'ADDR3') {
@@ -155,7 +155,7 @@ export default function App() {
     );
   }
 
-  // GNB 메뉴별 메인 구역의 테마 글로우 배경
+  // 테마 글로우 배경
   const themeGlowClass = 
     currentTab === 'BTV' 
       ? 'from-amber-500/10 via-slate-900 to-slate-900 border-amber-500/20' 
@@ -175,7 +175,7 @@ export default function App() {
         onLogout={logout} 
       />
 
-      {/* 테마 글로우 라이트 배경 컨테이너 */}
+      {/* 테마 배경 영역 */}
       <div className={`flex-1 max-w-6xl w-full mx-auto p-6 space-y-6 my-4 rounded-3xl bg-gradient-to-b ${themeGlowClass} border shadow-2xl transition-all duration-300`}>
         {currentTab === 'ADMIN' && (
           <AdminPanel
@@ -205,11 +205,50 @@ export default function App() {
               currentTab={currentTab}
             />
 
-            {state.currentStep === 1 && <Step1Budget state={state} actions={actions} volInfo={volInfo} onNext={() => actions.goToStep(2)} />}
-            {state.currentStep === 2 && <Step2Platform state={state} actions={actions} onPrev={() => actions.setCurrentStep(1)} onNext={() => actions.goToStep(3)} />}
-            {state.currentStep === 3 && <Step3Package state={state} actions={actions} calculation={calculation} onPrev={() => actions.setCurrentStep(2)} onNext={() => actions.goToStep(4)} />}
-            {state.currentStep === 4 && <Step4Audience state={state} actions={actions} audienceFormula={audienceFormula} onPrev={() => actions.setCurrentStep(3)} onNext={() => actions.goToStep(5)} />}
-            {state.currentStep === 5 && <Step5Estimate state={state} actions={actions} calculation={calculation} surchargeRules={surchargeRules} promoRules={promoRules} onPrev={() => actions.setCurrentStep(4)} onOpenProposal={() => setIsProposalOpen(true)} />}
+            {/* Step 1: 예산 및 기간 */}
+            {state.currentStep === 1 && (
+              <Step1Budget 
+                state={state} 
+                actions={actions} 
+                volInfo={volInfo} 
+                onNext={() => actions.goToStep(2)} 
+              />
+            )}
+
+            {/* Step 2: 상품 & 보너스 (기존 Step3Package) */}
+            {state.currentStep === 2 && (
+              <Step3Package 
+                state={state} 
+                actions={actions} 
+                calculation={calculation} 
+                onPrev={() => actions.setCurrentStep(1)} 
+                onNext={() => actions.goToStep(3)} 
+              />
+            )}
+
+            {/* Step 3: 타겟팅 (기존 Step4Audience) */}
+            {state.currentStep === 3 && (
+              <Step4Audience 
+                state={state} 
+                actions={actions} 
+                audienceFormula={audienceFormula} 
+                onPrev={() => actions.setCurrentStep(2)} 
+                onNext={() => actions.goToStep(4)} 
+              />
+            )}
+
+            {/* Step 4: 최종 견적 (기존 Step5Estimate) */}
+            {state.currentStep === 4 && (
+              <Step5Estimate 
+                state={state} 
+                actions={actions} 
+                calculation={calculation} 
+                surchargeRules={surchargeRules} 
+                promoRules={promoRules} 
+                onPrev={() => actions.setCurrentStep(3)} 
+                onOpenProposal={() => setIsProposalOpen(true)} 
+              />
+            )}
           </>
         )}
       </div>
