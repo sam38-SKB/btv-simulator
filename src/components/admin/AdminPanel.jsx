@@ -14,11 +14,12 @@ export default function AdminPanel({
   onDeleteProposal,
   onBackToDashboard
 }) {
-  // 1. 임시 편집용 로컬 상태 (Local Draft State)
+  // 임시 편집용 로컬 상태 (Local Draft State)
   const [draftBonus, setDraftBonus] = useState(bonusRules);
   const [draftSurcharge, setDraftSurcharge] = useState(surchargeRules);
   const [draftPromo, setDraftPromo] = useState(promoRules);
   const [isDirty, setIsDirty] = useState(false);
+  const [isSaving, setIsSaving] = useState(false); // 저장 로딩 상태
   const [selectedDetailProp, setSelectedDetailProp] = useState(null);
 
   // DB에서 수신된 props가 변경되면 로컬 드래프트에 반영
@@ -47,12 +48,27 @@ export default function AdminPanel({
     channel: '📺 채널 타겟팅'
   };
 
-  // 💾 [저장 버튼] 클릭 이벤트 핸들러
+  // 💾 [저장 버튼] 클릭 이벤트 핸들러 (실행 결과 피드백 알림 포함)
   const handleSaveAll = async () => {
-    if (onSaveRules) {
-      await onSaveRules(draftBonus, draftSurcharge, draftPromo);
-      setIsDirty(false);
-      alert('모든 정책 및 요율이 Firebase DB에 성공적으로 저장되었습니다!');
+    if (!onSaveRules) {
+      alert('⚠️ 저장 함수가 연결되지 않았습니다.');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const result = await onSaveRules(draftBonus, draftSurcharge, draftPromo);
+      if (result && result.success) {
+        setIsDirty(false);
+        alert('✅ [저장 성공] 모든 정책 및 요율이 Firebase Cloud DB에 정상적으로 반영되었습니다!\n모든 접속 단말에 즉시 적용됩니다.');
+      } else {
+        const errorMsg = result?.error || '알 수 없는 오류가 발생했습니다.';
+        alert(`❌ [저장 실패] Firebase DB 저장에 실패했습니다.\n\n원인: ${errorMsg}\n\nNetlify 환경변수 설정 및 Firebase 보안 규칙을 확인해 주세요.`);
+      }
+    } catch (err) {
+      alert(`❌ [저장 오류] 예외가 발생했습니다:\n${err.message}`);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -88,20 +104,6 @@ export default function AdminPanel({
     });
   };
 
-  // 프로모션 변경
-  const handlePromoChange = (platform, actionType, index, field, value) => {
-    setIsDirty(true);
-    setDraftPromo(prev => {
-      const updated = { ...prev };
-      const list = [...(updated[platform] || [])];
-      if (actionType === 'ADD') list.push({ id: `${platform}_${Date.now()}`, name: '신규 프로모션', desc: '설명 입력', rate: 10, type: 'RATE' });
-      else if (actionType === 'DELETE') list.splice(index, 1);
-      else if (actionType === 'CHANGE') list[index] = { ...list[index], [field]: value };
-      updated[platform] = list;
-      return updated;
-    });
-  };
-
   return (
     <div className="max-w-6xl mx-auto space-y-6 text-slate-100 pb-20">
       {/* 헤더 바 */}
@@ -109,18 +111,23 @@ export default function AdminPanel({
         <div>
           <h2 className="text-2xl font-black text-purple-200">🛡️ B tv Agent 시스템 관리자 페이지</h2>
           <p className="text-sm text-purple-300/80 mt-1">
-            요율 편집 후 우측 상단의 <span className="text-amber-400 font-bold">[DB 저장하기]</span> 버튼을 눌러주세요.
+            요율 편집 후 우측 상단의 <span className="text-amber-400 font-bold">[DB 저장하기]</span> 버튼을 누르면 전체 기기에 반영됩니다.
           </p>
         </div>
         <div className="flex items-center space-x-3">
           <button 
             onClick={handleSaveAll} 
+            disabled={isSaving}
             className={`px-5 py-2.5 rounded-xl font-black text-sm shadow-xl transition-all flex items-center space-x-2 ${
-              isDirty ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 animate-bounce' : 'bg-emerald-600 hover:bg-emerald-500 text-white'
+              isSaving 
+                ? 'bg-slate-600 cursor-not-allowed text-slate-300' 
+                : isDirty 
+                  ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 animate-pulse' 
+                  : 'bg-emerald-600 hover:bg-emerald-500 text-white'
             }`}
           >
-            <span>💾 DB에 정책 저장하기</span>
-            {isDirty && <span className="bg-red-600 text-white text-[10px] px-1.5 py-0.5 rounded-full">수정됨</span>}
+            <span>{isSaving ? '⏳ DB에 저장 중...' : '💾 DB에 정책 저장하기'}</span>
+            {isDirty && !isSaving && <span className="bg-red-600 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold">수정됨</span>}
           </button>
           <button onClick={onBackToDashboard} className="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2.5 rounded-xl font-bold text-sm">
             📊 시뮬레이터로 이동
@@ -128,7 +135,7 @@ export default function AdminPanel({
         </div>
       </div>
 
-      {/* 요약 카드 */}
+      {/* 대시보드 요약 카드 */}
       <div className="grid grid-cols-4 gap-4 text-center text-xs">
         <div className="bg-slate-800 border border-slate-700 p-4 rounded-2xl">
           <div className="text-slate-400 font-bold">전체 사용자</div>
@@ -321,7 +328,7 @@ export default function AdminPanel({
         </div>
       </div>
 
-      {/* 사용자 관리 표 */}
+      {/* 사용자 계정 목록 표 */}
       <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-2xl space-y-4 overflow-x-auto">
         <h3 className="text-lg font-bold text-white mb-2">사용자 승인 및 계정 관리</h3>
         <table className="w-full text-left text-sm">

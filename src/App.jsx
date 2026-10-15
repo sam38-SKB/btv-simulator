@@ -31,31 +31,44 @@ export default function App() {
   const [surchargeRules, setSurchargeRules] = useState(DEFAULT_SURCHARGE_RULES);
   const [promoRules, setPromoRules] = useState(DEFAULT_PROMO_RULES);
 
-  // 1. Firebase Firestore 실시간 데이터 동기화 (전체 단말 공통)
+  // 1. Firebase Firestore 실시간 데이터 동기화
   useEffect(() => {
-    // 정책 설정 (보너스, 할증, 프로모션) 실시간 수신
-    const unsubRules = onSnapshot(doc(db, 'settings', 'rules'), (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        if (data.bonusRules) setBonusRules(data.bonusRules);
-        if (data.surchargeRules) setSurchargeRules(data.surchargeRules);
-        if (data.promoRules) setPromoRules(data.promoRules);
-      } else {
-        // DB에 문서가 없는 최초 접속 시 기본값 자동 저장
-        setDoc(doc(db, 'settings', 'rules'), {
-          bonusRules: DEFAULT_BONUS_RULES,
-          surchargeRules: DEFAULT_SURCHARGE_RULES,
-          promoRules: DEFAULT_PROMO_RULES
-        });
-      }
-    });
+    if (!db) return;
 
-    // 제출된 청약/견적서 내역 실시간 수신
-    const unsubProps = onSnapshot(collection(db, 'proposals'), (snapshot) => {
-      const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-      list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-      setProposals(list);
-    });
+    // 정책 설정 (보너스, 할증, 프로모션) 실시간 수신
+    const unsubRules = onSnapshot(
+      doc(db, 'settings', 'rules'),
+      (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          if (data.bonusRules) setBonusRules(data.bonusRules);
+          if (data.surchargeRules) setSurchargeRules(data.surchargeRules);
+          if (data.promoRules) setPromoRules(data.promoRules);
+        } else {
+          setDoc(doc(db, 'settings', 'rules'), {
+            bonusRules: DEFAULT_BONUS_RULES,
+            surchargeRules: DEFAULT_SURCHARGE_RULES,
+            promoRules: DEFAULT_PROMO_RULES
+          }).catch(err => console.error("Firestore init error:", err));
+        }
+      },
+      (error) => {
+        console.error("Firestore rules sync error:", error);
+      }
+    );
+
+    // 제출된 청약 내역 실시간 수신
+    const unsubProps = onSnapshot(
+      collection(db, 'proposals'),
+      (snapshot) => {
+        const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        setProposals(list);
+      },
+      (error) => {
+        console.error("Firestore proposals sync error:", error);
+      }
+    );
 
     return () => {
       unsubRules();
@@ -63,17 +76,35 @@ export default function App() {
     };
   }, []);
 
-  // 2. 관리자 페이지에서 [💾 DB에 정책 저장하기] 클릭 시 일괄 업데이트
+  // 2. [💾 DB에 정책 저장하기] 일괄 업데이트 처리 (결과 리턴)
   const handleSaveRules = async (newBonus, newSurcharge, newPromo) => {
-    setBonusRules(newBonus);
-    setSurchargeRules(newSurcharge);
-    setPromoRules(newPromo);
+    if (!db) {
+      return { success: false, error: 'Firebase DB 객체가 초기화되지 않았습니다.' };
+    }
 
-    await setDoc(doc(db, 'settings', 'rules'), {
-      bonusRules: newBonus,
-      surchargeRules: newSurcharge,
-      promoRules: newPromo
-    });
+    try {
+      // 8초 타임아웃 적용 (네트워크 멈춤 대비)
+      const savePromise = setDoc(doc(db, 'settings', 'rules'), {
+        bonusRules: newBonus,
+        surchargeRules: newSurcharge,
+        promoRules: newPromo
+      });
+
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('네트워크 응답 시간 초과 (8초)')), 8000)
+      );
+
+      await Promise.race([savePromise, timeoutPromise]);
+
+      setBonusRules(newBonus);
+      setSurchargeRules(newSurcharge);
+      setPromoRules(newPromo);
+
+      return { success: true };
+    } catch (error) {
+      console.error("Firebase DB 저장 실패:", error);
+      return { success: false, error: error.message };
+    }
   };
 
   const simulator = useSimulator(bonusRules, surchargeRules, promoRules);
@@ -94,23 +125,32 @@ export default function App() {
     else { alert('회원가입 신청이 완료되었습니다. 관리자 승인 후 로그인해 주세요.'); setView('LOGIN'); }
   };
 
-  // 청약 제출 ➔ DB 저장
   const handleSubmitProposal = async (newProposal) => {
-    await setDoc(doc(db, 'proposals', newProposal.id), newProposal);
-  };
-
-  // 청약 상태 변경 (승인/반려) ➔ DB 업데이트
-  const handleUpdateProposalStatus = async (id, newStatus) => {
-    const target = proposals.find(p => p.id === id);
-    if (target) {
-      await setDoc(doc(db, 'proposals', id), { ...target, status: newStatus });
+    try {
+      await setDoc(doc(db, 'proposals', newProposal.id), newProposal);
+    } catch (error) {
+      alert(`청약 제출 실패: ${error.message}`);
     }
   };
 
-  // 청약 삭제 ➔ DB 삭제
+  const handleUpdateProposalStatus = async (id, newStatus) => {
+    const target = proposals.find(p => p.id === id);
+    if (target) {
+      try {
+        await setDoc(doc(db, 'proposals', id), { ...target, status: newStatus });
+      } catch (error) {
+        console.error("청약 상태 변경 실패:", error);
+      }
+    }
+  };
+
   const handleDeleteProposal = async (id) => {
     if (confirm('해당 청약 제출 내역을 삭제하시겠습니까?')) {
-      await deleteDoc(doc(db, 'proposals', id));
+      try {
+        await deleteDoc(doc(db, 'proposals', id));
+      } catch (error) {
+        console.error("청약 삭제 실패:", error);
+      }
     }
   };
 
@@ -167,4 +207,3 @@ export default function App() {
     </div>
   );
 }
-// admin 업데이트 //
