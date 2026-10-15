@@ -17,25 +17,27 @@ import Step3Package from './components/steps/Step3Package';
 import Step4Audience from './components/steps/Step4Audience';
 import Step5Estimate from './components/steps/Step5Estimate';
 
+import ProductInfoView from './components/info/ProductInfoView';
 import AdminPanel from './components/admin/AdminPanel';
 import ChatbotDrawer from './components/common/ChatbotDrawer';
 import ProposalModal from './components/common/ProposalModal';
 
 export default function App() {
   const { users, currentUser, login, signup, logout, updateUserStatus, deleteUser } = useAuth();
-  const [view, setView] = useState('DASHBOARD');
   
+  // GNB 메뉴 상태: 'BTV', 'ADDR3', 'INFO', 'ADMIN'
+  const [currentTab, setCurrentTab] = useState('BTV');
+
   // Firebase DB 연동 상태
   const [proposals, setProposals] = useState([]);
   const [bonusRules, setBonusRules] = useState(DEFAULT_BONUS_RULES);
   const [surchargeRules, setSurchargeRules] = useState(DEFAULT_SURCHARGE_RULES);
   const [promoRules, setPromoRules] = useState(DEFAULT_PROMO_RULES);
 
-  // 1. Firebase Firestore 실시간 데이터 동기화
+  // 1. Firebase Firestore 실시간 동기화
   useEffect(() => {
     if (!db) return;
 
-    // 정책 설정 (보너스, 할증, 프로모션) 실시간 수신
     const unsubRules = onSnapshot(
       doc(db, 'settings', 'rules'),
       (docSnap) => {
@@ -52,12 +54,9 @@ export default function App() {
           }).catch(err => console.error("Firestore init error:", err));
         }
       },
-      (error) => {
-        console.error("Firestore rules sync error:", error);
-      }
+      (error) => console.error("Firestore rules sync error:", error)
     );
 
-    // 제출된 청약 내역 실시간 수신
     const unsubProps = onSnapshot(
       collection(db, 'proposals'),
       (snapshot) => {
@@ -65,9 +64,7 @@ export default function App() {
         list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
         setProposals(list);
       },
-      (error) => {
-        console.error("Firestore proposals sync error:", error);
-      }
+      (error) => console.error("Firestore proposals sync error:", error)
     );
 
     return () => {
@@ -76,14 +73,27 @@ export default function App() {
     };
   }, []);
 
-  // 2. [💾 DB에 정책 저장하기] 일괄 업데이트 처리 (결과 리턴)
-  const handleSaveRules = async (newBonus, newSurcharge, newPromo) => {
-    if (!db) {
-      return { success: false, error: 'Firebase DB 객체가 초기화되지 않았습니다.' };
+  const simulator = useSimulator(bonusRules, surchargeRules, promoRules);
+  const { state, actions, volInfo, audienceFormula, calculation } = simulator;
+
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isProposalOpen, setIsProposalOpen] = useState(false);
+
+  // GNB 메뉴 선택 처리 핸들러
+  const handleSelectTab = (tab) => {
+    setCurrentTab(tab);
+    if (tab === 'BTV') {
+      actions.setPlatformMode('BTV');
+    } else if (tab === 'ADDR3') {
+      actions.setPlatformMode('ADDR3');
     }
+  };
+
+  // 관리자 일괄 정책 저장
+  const handleSaveRules = async (newBonus, newSurcharge, newPromo) => {
+    if (!db) return { success: false, error: 'Firebase DB 연결 없음' };
 
     try {
-      // 8초 타임아웃 적용 (네트워크 멈춤 대비)
       const savePromise = setDoc(doc(db, 'settings', 'rules'), {
         bonusRules: newBonus,
         surchargeRules: newSurcharge,
@@ -102,27 +112,20 @@ export default function App() {
 
       return { success: true };
     } catch (error) {
-      console.error("Firebase DB 저장 실패:", error);
       return { success: false, error: error.message };
     }
   };
 
-  const simulator = useSimulator(bonusRules, surchargeRules, promoRules);
-  const { state, actions, volInfo, audienceFormula, calculation } = simulator;
-
-  const [isChatOpen, setIsChatOpen] = useState(false);
-  const [isProposalOpen, setIsProposalOpen] = useState(false);
-
   const handleLogin = (id, pw) => {
     const res = login(id, pw);
     if (!res.success) alert(res.message);
-    else setView(res.role === 'ADMIN' ? 'ADMIN' : 'DASHBOARD');
+    else setCurrentTab(res.role === 'ADMIN' ? 'ADMIN' : 'BTV');
   };
 
   const handleSignup = (form) => {
     const res = signup(form);
     if (!res.success) alert(res.message);
-    else { alert('회원가입 신청이 완료되었습니다. 관리자 승인 후 로그인해 주세요.'); setView('LOGIN'); }
+    else { alert('회원가입 신청이 완료되었습니다. 관리자 승인 후 로그인해 주세요.'); setCurrentTab('LOGIN'); }
   };
 
   const handleSubmitProposal = async (newProposal) => {
@@ -136,38 +139,36 @@ export default function App() {
   const handleUpdateProposalStatus = async (id, newStatus) => {
     const target = proposals.find(p => p.id === id);
     if (target) {
-      try {
-        await setDoc(doc(db, 'proposals', id), { ...target, status: newStatus });
-      } catch (error) {
-        console.error("청약 상태 변경 실패:", error);
-      }
+      try { await setDoc(doc(db, 'proposals', id), { ...target, status: newStatus }); } catch (e) {}
     }
   };
 
   const handleDeleteProposal = async (id) => {
     if (confirm('해당 청약 제출 내역을 삭제하시겠습니까?')) {
-      try {
-        await deleteDoc(doc(db, 'proposals', id));
-      } catch (error) {
-        console.error("청약 삭제 실패:", error);
-      }
+      try { await deleteDoc(doc(db, 'proposals', id)); } catch (e) {}
     }
   };
 
   if (!currentUser) {
-    return view === 'SIGNUP' ? (
-      <SignupView onSignup={handleSignup} onCancel={() => setView('LOGIN')} />
+    return currentTab === 'SIGNUP' ? (
+      <SignupView onSignup={handleSignup} onCancel={() => setCurrentTab('LOGIN')} />
     ) : (
-      <LoginView onLogin={handleLogin} onGoSignup={() => setView('SIGNUP')} />
+      <LoginView onLogin={handleLogin} onGoSignup={() => setCurrentTab('SIGNUP')} />
     );
   }
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 font-sans relative flex flex-col">
-      <Header user={currentUser} view={view} setView={setView} onLogout={logout} />
+      {/* 상단 GNB 헤더 */}
+      <Header 
+        user={currentUser} 
+        currentTab={currentTab} 
+        onSelectTab={handleSelectTab} 
+        onLogout={logout} 
+      />
 
       <main className="flex-1 max-w-6xl w-full mx-auto p-6 space-y-6">
-        {view === 'ADMIN' ? (
+        {currentTab === 'ADMIN' && (
           <AdminPanel
             users={users}
             proposals={proposals}
@@ -179,9 +180,15 @@ export default function App() {
             onDeleteUser={deleteUser}
             onUpdateProposalStatus={handleUpdateProposalStatus}
             onDeleteProposal={handleDeleteProposal}
-            onBackToDashboard={() => setView('DASHBOARD')}
+            onBackToDashboard={() => handleSelectTab('BTV')}
           />
-        ) : (
+        )}
+
+        {currentTab === 'INFO' && (
+          <ProductInfoView onGoSimulator={(mode) => handleSelectTab(mode)} />
+        )}
+
+        {(currentTab === 'BTV' || currentTab === 'ADDR3') && (
           <>
             <StepIndicator currentStep={state.currentStep} goToStep={actions.goToStep} setCurrentStep={actions.setCurrentStep} />
 
@@ -195,15 +202,37 @@ export default function App() {
       </main>
 
       {/* 챗봇 버튼 */}
-      {view === 'DASHBOARD' && (
-        <button onClick={() => setIsChatOpen(!isChatOpen)} className="fixed bottom-6 right-6 z-50 bg-gradient-to-r from-red-600 to-orange-500 text-white font-bold px-5 py-3.5 rounded-full shadow-2xl flex items-center space-x-2.5">
+      {currentTab !== 'ADMIN' && (
+        <button 
+          onClick={() => setIsChatOpen(!isChatOpen)} 
+          className="fixed bottom-6 right-6 z-50 bg-gradient-to-r from-red-600 to-orange-500 text-white font-bold px-5 py-3.5 rounded-full shadow-2xl flex items-center space-x-2.5 hover:scale-105 transition-all"
+        >
           <span className="text-xl">🤖</span>
           <span className="text-sm font-black">챗봇 문의</span>
         </button>
       )}
 
-      <ChatbotDrawer isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} onApplyRecommendation={(rec) => { actions.setPlatformMode(rec.platformMode); actions.setProductMode(rec.productMode); actions.setVideoLength(rec.videoLength); alert('추천 조건이 적용되었습니다!'); }} />
-      <ProposalModal isOpen={isProposalOpen} onClose={() => setIsProposalOpen(false)} state={state} calculation={calculation} audienceFormula={audienceFormula} currentUser={currentUser} onSubmitProposal={handleSubmitProposal} />
+      <ChatbotDrawer 
+        isOpen={isChatOpen} 
+        onClose={() => setIsChatOpen(false)} 
+        onApplyRecommendation={(rec) => { 
+          actions.setPlatformMode(rec.platformMode); 
+          actions.setProductMode(rec.productMode); 
+          actions.setVideoLength(rec.videoLength); 
+          handleSelectTab(rec.platformMode);
+          alert('추천 조건이 적용되었습니다!'); 
+        }} 
+      />
+      
+      <ProposalModal 
+        isOpen={isProposalOpen} 
+        onClose={() => setIsProposalOpen(false)} 
+        state={state} 
+        calculation={calculation} 
+        audienceFormula={audienceFormula} 
+        currentUser={currentUser} 
+        onSubmitProposal={handleSubmitProposal} 
+      />
     </div>
   );
 }
