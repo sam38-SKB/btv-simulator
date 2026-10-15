@@ -34,7 +34,6 @@ export default function App() {
   const [surchargeRules, setSurchargeRules] = useState(DEFAULT_SURCHARGE_RULES);
   const [promoRules, setPromoRules] = useState(DEFAULT_PROMO_RULES);
 
-  // 1. Firebase Firestore 실시간 동기화
   useEffect(() => {
     if (!db) return;
 
@@ -79,7 +78,7 @@ export default function App() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isProposalOpen, setIsProposalOpen] = useState(false);
 
-  // GNB 메뉴 선택 처리 핸들러
+  // GNB 메뉴 선택 시 모드 자동 스위칭
   const handleSelectTab = (tab) => {
     setCurrentTab(tab);
     if (tab === 'BTV') {
@@ -89,7 +88,6 @@ export default function App() {
     }
   };
 
-  // 관리자 일괄 정책 저장
   const handleSaveRules = async (newBonus, newSurcharge, newPromo) => {
     if (!db) return { success: false, error: 'Firebase DB 연결 없음' };
 
@@ -157,8 +155,18 @@ export default function App() {
     );
   }
 
+  // GNB 메뉴별 메인 구역의 테마 글로우 배경
+  const themeGlowClass = 
+    currentTab === 'BTV' 
+      ? 'from-amber-500/10 via-slate-900 to-slate-900 border-amber-500/20' 
+      : currentTab === 'ADDR3' 
+      ? 'from-sky-500/10 via-slate-900 to-slate-900 border-sky-500/20'
+      : currentTab === 'INFO'
+      ? 'from-purple-500/10 via-slate-900 to-slate-900 border-purple-500/20'
+      : 'from-purple-900/20 via-slate-900 to-slate-900 border-purple-600/30';
+
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 font-sans relative flex flex-col">
+    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans relative flex flex-col">
       {/* 상단 GNB 헤더 */}
       <Header 
         user={currentUser} 
@@ -167,7 +175,8 @@ export default function App() {
         onLogout={logout} 
       />
 
-      <main className="flex-1 max-w-6xl w-full mx-auto p-6 space-y-6">
+      {/* 테마 글로우 라이트 배경 컨테이너 */}
+      <div className={`flex-1 max-w-6xl w-full mx-auto p-6 space-y-6 my-4 rounded-3xl bg-gradient-to-b ${themeGlowClass} border shadow-2xl transition-all duration-300`}>
         {currentTab === 'ADMIN' && (
           <AdminPanel
             users={users}
@@ -190,7 +199,11 @@ export default function App() {
 
         {(currentTab === 'BTV' || currentTab === 'ADDR3') && (
           <>
-            <StepIndicator currentStep={state.currentStep} goToStep={actions.goToStep} setCurrentStep={actions.setCurrentStep} />
+            <StepIndicator 
+              currentStep={state.currentStep} 
+              goToStep={actions.goToStep} 
+              currentTab={currentTab}
+            />
 
             {state.currentStep === 1 && <Step1Budget state={state} actions={actions} volInfo={volInfo} onNext={() => actions.goToStep(2)} />}
             {state.currentStep === 2 && <Step2Platform state={state} actions={actions} onPrev={() => actions.setCurrentStep(1)} onNext={() => actions.goToStep(3)} />}
@@ -199,16 +212,16 @@ export default function App() {
             {state.currentStep === 5 && <Step5Estimate state={state} actions={actions} calculation={calculation} surchargeRules={surchargeRules} promoRules={promoRules} onPrev={() => actions.setCurrentStep(4)} onOpenProposal={() => setIsProposalOpen(true)} />}
           </>
         )}
-      </main>
+      </div>
 
-      {/* 챗봇 버튼 */}
+      {/* 챗봇 floating 버튼 */}
       {currentTab !== 'ADMIN' && (
         <button 
           onClick={() => setIsChatOpen(!isChatOpen)} 
-          className="fixed bottom-6 right-6 z-50 bg-gradient-to-r from-red-600 to-orange-500 text-white font-bold px-5 py-3.5 rounded-full shadow-2xl flex items-center space-x-2.5 hover:scale-105 transition-all"
+          className="fixed bottom-6 right-6 z-50 bg-gradient-to-r from-red-600 via-orange-500 to-amber-500 text-slate-950 font-black px-5 py-3.5 rounded-full shadow-2xl flex items-center space-x-2 hover:scale-105 transition-all ring-2 ring-amber-300"
         >
           <span className="text-xl">🤖</span>
-          <span className="text-sm font-black">챗봇 문의</span>
+          <span className="text-xs font-black tracking-wide">챗봇 문의</span>
         </button>
       )}
 
