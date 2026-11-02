@@ -1,393 +1,481 @@
 import React, { useState, useEffect } from 'react';
-import { DEFAULT_BONUS_RULES, DEFAULT_SURCHARGE_RULES, DEFAULT_PROMO_RULES } from '../../constants/defaultRules';
 
-export default function AdminPanel({ 
-  users = [], 
+export default function AdminPanel({
+  users = [],
   proposals = [],
-  bonusRules = DEFAULT_BONUS_RULES, 
-  surchargeRules = DEFAULT_SURCHARGE_RULES, 
-  promoRules = DEFAULT_PROMO_RULES, 
+  bonusRules = [],
+  surchargeRules = {},
+  promoRules = [],
   onSaveRules,
-  onStatusChange, 
-  onDeleteUser, 
+  onStatusChange,
+  onDeleteUser,
   onUpdateProposalStatus,
   onDeleteProposal,
   onBackToDashboard
 }) {
-  // 임시 편집용 로컬 상태 (Local Draft State)
-  const [draftBonus, setDraftBonus] = useState(bonusRules);
-  const [draftSurcharge, setDraftSurcharge] = useState(surchargeRules);
-  const [draftPromo, setDraftPromo] = useState(promoRules);
-  const [isDirty, setIsDirty] = useState(false);
-  const [isSaving, setIsSaving] = useState(false); // 저장 로딩 상태
-  const [selectedDetailProp, setSelectedDetailProp] = useState(null);
+  const [activeTab, setActiveTab] = useState('RULES'); // 'RULES' | 'PROPOSALS' | 'USERS'
+  const [isSaving, setIsSaving] = useState(false);
 
-  // DB에서 수신된 props가 변경되면 로컬 드래프트에 반영
-  useEffect(() => { setDraftBonus(bonusRules); }, [bonusRules]);
-  useEffect(() => { setDraftSurcharge(surchargeRules); }, [surchargeRules]);
-  useEffect(() => { setDraftPromo(promoRules); }, [promoRules]);
+  // 로컬 로드/편집 상태
+  const [draftBonus, setDraftBonus] = useState([]);
+  const [draftSurcharge, setDraftSurcharge] = useState({});
+  const [draftPromo, setDraftPromo] = useState([]);
 
-  const safeBonusRules = {
-    BTV: (draftBonus && draftBonus.BTV && Array.isArray(draftBonus.BTV)) ? draftBonus.BTV : DEFAULT_BONUS_RULES.BTV,
-    ADDR3: (draftBonus && draftBonus.ADDR3 && Array.isArray(draftBonus.ADDR3)) ? draftBonus.ADDR3 : DEFAULT_BONUS_RULES.ADDR3
+  useEffect(() => {
+    if (bonusRules) setDraftBonus(JSON.parse(JSON.stringify(bonusRules)));
+    if (surchargeRules) setDraftSurcharge(JSON.parse(JSON.stringify(surchargeRules)));
+    if (promoRules) setDraftPromo(JSON.parse(JSON.stringify(promoRules)));
+  }, [bonusRules, surchargeRules, promoRules]);
+
+  // 프로모션 항목 수정 핸들러
+  const handlePromoChange = (index, field, value) => {
+    const updated = [...draftPromo];
+    updated[index] = { ...updated[index], [field]: value };
+    setDraftPromo(updated);
   };
 
-  const safeSurchargeRules = {
-    BTV: (draftSurcharge && draftSurcharge.BTV) ? draftSurcharge.BTV : DEFAULT_SURCHARGE_RULES.BTV,
-    ADDR3: (draftSurcharge && draftSurcharge.ADDR3) ? draftSurcharge.ADDR3 : DEFAULT_SURCHARGE_RULES.ADDR3
+  // 프로모션 항목 추가
+  const handleAddPromo = () => {
+    setDraftPromo([
+      ...draftPromo,
+      {
+        id: `promo_${Date.now()}`,
+        name: '신규 프로모션 혜택',
+        rate: 10,
+        description: '혜택 및 우대 조건 설명을 입력하세요.',
+        isActive: true,
+      }
+    ]);
   };
 
-  const safePromoRules = {
-    BTV: (draftPromo && draftPromo.BTV && Array.isArray(draftPromo.BTV)) ? draftPromo.BTV : DEFAULT_PROMO_RULES.BTV,
-    ADDR3: (draftPromo && draftPromo.ADDR3 && Array.isArray(draftPromo.ADDR3)) ? draftPromo.ADDR3 : DEFAULT_PROMO_RULES.ADDR3
-  };
-
-  const surchargeCategoryNames = {
-    region: '📍 지역 타겟팅',
-    time: '⏰ 시간대 타겟팅',
-    channel: '📺 채널 타겟팅'
-  };
-
-  // 💾 [저장 버튼] 클릭 이벤트 핸들러 (실행 결과 피드백 알림 포함)
-  const handleSaveAll = async () => {
-    if (!onSaveRules) {
-      alert('⚠️ 저장 함수가 연결되지 않았습니다.');
-      return;
+  // 프로모션 항목 삭제
+  const handleDeletePromo = (index) => {
+    if (confirm('해당 프로모션 항목을 삭제하시겠습니까?')) {
+      const updated = draftPromo.filter((_, i) => i !== index);
+      setDraftPromo(updated);
     }
+  };
 
+  // 전체 정책 일괄 저장
+  const handleSaveAllRules = async () => {
     setIsSaving(true);
     try {
       const result = await onSaveRules(draftBonus, draftSurcharge, draftPromo);
-      if (result && result.success) {
-        setIsDirty(false);
-        alert('✅ [저장 성공] 모든 정책 및 요율이 Firebase Cloud DB에 정상적으로 반영되었습니다!\n모든 접속 단말에 즉시 적용됩니다.');
+      if (result?.success) {
+        alert('✅ 모든 정책(보너스, 할증, 프로모션)이 DB에 성공적으로 저장되었습니다!');
       } else {
-        const errorMsg = result?.error || '알 수 없는 오류가 발생했습니다.';
-        alert(`❌ [저장 실패] Firebase DB 저장에 실패했습니다.\n\n원인: ${errorMsg}\n\nNetlify 환경변수 설정 및 Firebase 보안 규칙을 확인해 주세요.`);
+        alert(`❌ 저장 실패: ${result?.error || '오류가 발생했습니다.'}`);
       }
     } catch (err) {
-      alert(`❌ [저장 오류] 예외가 발생했습니다:\n${err.message}`);
+      alert(`❌ 저장 중 오류 발생: ${err.message}`);
     } finally {
       setIsSaving(false);
     }
   };
 
-  // 보너스 변경
-  const handleBonusChange = (platform, actionType, index, field, value) => {
-    setIsDirty(true);
-    setDraftBonus(prev => {
-      const updated = { ...prev };
-      const list = [...(updated[platform] || [])];
-      if (actionType === 'ADD') list.push({ minMonthlyBudget: 10000000, minMonths: 1, rate: 10 });
-      else if (actionType === 'DELETE') list.splice(index, 1);
-      else if (actionType === 'CHANGE') list[index] = { ...list[index], [field]: value };
-      updated[platform] = list;
-      return updated;
-    });
-  };
-
-  // 할증 요율 변경
-  const handleSurchargeChange = (platform, category, actionType, index, field, value) => {
-    setIsDirty(true);
-    setDraftSurcharge(prev => {
-      const updated = { ...prev };
-      const platformObj = { ...(updated[platform] || DEFAULT_SURCHARGE_RULES[platform]) };
-      const list = [...(platformObj[category] || [])];
-
-      if (actionType === 'ADD') list.push({ id: `S_${Date.now()}`, name: '신규 할증 조건', rate: 10 });
-      else if (actionType === 'DELETE') list.splice(index, 1);
-      else if (actionType === 'CHANGE') list[index] = { ...list[index], [field]: value };
-
-      platformObj[category] = list;
-      updated[platform] = platformObj;
-      return updated;
-    });
-  };
-
   return (
-    <div className="max-w-6xl mx-auto space-y-6 text-slate-100 pb-20">
-      {/* 헤더 바 */}
-      <div className="bg-gradient-to-r from-purple-900/60 to-slate-800 border border-purple-700 p-6 rounded-2xl shadow-xl flex flex-wrap justify-between items-center gap-4">
+    <div className="space-y-6 text-slate-100">
+      {/* 관리자 패널 상단 헤더 */}
+      <div className="bg-slate-900 border border-purple-500/40 p-6 rounded-3xl shadow-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-black text-purple-200">🛡️ B tv Agent 시스템 관리자 페이지</h2>
-          <p className="text-sm text-purple-300/80 mt-1">
-            요율 편집 후 우측 상단의 <span className="text-amber-400 font-bold">[DB 저장하기]</span> 버튼을 누르면 전체 기기에 반영됩니다.
+          <div className="flex items-center space-x-2">
+            <span className="text-2xl">🛡️</span>
+            <h2 className="text-2xl font-black text-white">B tv AD 관리자 콘솔</h2>
+            <span className="bg-purple-600/30 text-purple-300 text-xs px-2.5 py-0.5 rounded-full font-bold border border-purple-500/40">
+              System Admin
+            </span>
+          </div>
+          <p className="text-slate-400 text-xs mt-1">
+            시뮬레이터 보너스·할증 요율, 프로모션 혜택 조건, 청약서 및 사용자 승인 권한을 관리합니다.
           </p>
         </div>
-        <div className="flex items-center space-x-3">
-          <button 
-            onClick={handleSaveAll} 
-            disabled={isSaving}
-            className={`px-5 py-2.5 rounded-xl font-black text-sm shadow-xl transition-all flex items-center space-x-2 ${
-              isSaving 
-                ? 'bg-slate-600 cursor-not-allowed text-slate-300' 
-                : isDirty 
-                  ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 animate-pulse' 
-                  : 'bg-emerald-600 hover:bg-emerald-500 text-white'
-            }`}
-          >
-            <span>{isSaving ? '⏳ DB에 저장 중...' : '💾 DB에 정책 저장하기'}</span>
-            {isDirty && !isSaving && <span className="bg-red-600 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold">수정됨</span>}
-          </button>
-          <button onClick={onBackToDashboard} className="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2.5 rounded-xl font-bold text-sm">
-            📊 시뮬레이터로 이동
-          </button>
-        </div>
+
+        <button
+          onClick={onBackToDashboard}
+          className="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold px-4 py-2.5 rounded-xl border border-slate-700 transition-all flex items-center space-x-1.5"
+        >
+          <span>←</span>
+          <span>시뮬레이터로 돌아가기</span>
+        </button>
       </div>
 
-      {/* 대시보드 요약 카드 */}
-      <div className="grid grid-cols-4 gap-4 text-center text-xs">
-        <div className="bg-slate-800 border border-slate-700 p-4 rounded-2xl">
-          <div className="text-slate-400 font-bold">전체 사용자</div>
-          <div className="text-2xl font-black text-white mt-1">{(users || []).length} 명</div>
-        </div>
-        <div className="bg-slate-800 border border-amber-700/60 p-4 rounded-2xl">
-          <div className="text-amber-400 font-bold">가입 승인 대기</div>
-          <div className="text-2xl font-black text-amber-300 mt-1">{(users || []).filter(u => u.status === 'PENDING').length} 명</div>
-        </div>
-        <div className="bg-slate-800 border border-sky-700/60 p-4 rounded-2xl">
-          <div className="text-sky-400 font-bold">제출된 청약/견적서</div>
-          <div className="text-2xl font-black text-sky-300 mt-1">{(proposals || []).length} 건</div>
-        </div>
-        <div className="bg-slate-800 border border-emerald-700/60 p-4 rounded-2xl">
-          <div className="text-emerald-400 font-bold">청약 완료 금액</div>
-          <div className="text-2xl font-black text-emerald-300 mt-1">
-            {((proposals || []).reduce((acc, cur) => acc + (cur.totalBudget || 0), 0) / 10000).toLocaleString()} 만원
+      {/* 탭 네비게이션 */}
+      <div className="flex space-x-2 border-b border-slate-800 pb-2">
+        <button
+          onClick={() => setActiveTab('RULES')}
+          className={`px-5 py-2.5 rounded-xl text-xs font-black transition-all flex items-center space-x-2 ${
+            activeTab === 'RULES'
+              ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30'
+              : 'bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800'
+          }`}
+        >
+          <span>⚙️</span>
+          <span>정책 및 프로모션 관리</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('PROPOSALS')}
+          className={`px-5 py-2.5 rounded-xl text-xs font-black transition-all flex items-center space-x-2 ${
+            activeTab === 'PROPOSALS'
+              ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30'
+              : 'bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800'
+          }`}
+        >
+          <span>📄</span>
+          <span>제출된 청약 관리 ({proposals.length})</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('USERS')}
+          className={`px-5 py-2.5 rounded-xl text-xs font-black transition-all flex items-center space-x-2 ${
+            activeTab === 'USERS'
+              ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30'
+              : 'bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800'
+          }`}
+        >
+          <span>👥</span>
+          <span>사용자 계정 승인</span>
+        </button>
+      </div>
+
+      {/* TAB 1: 정책 및 프로모션 설정 */}
+      {activeTab === 'RULES' && (
+        <div className="space-y-6">
+          {/* 일괄 저장 하단 고정/상단 저장 툴바 */}
+          <div className="bg-slate-900 border border-slate-700 p-4 rounded-2xl flex justify-between items-center shadow-lg">
+            <span className="text-xs text-slate-300 font-semibold">
+              ⚠️ 수정 후 **[💾 DB에 정책 저장하기]**를 눌러야 전체 단말에 즉시 적용됩니다.
+            </span>
+            <button
+              onClick={handleSaveAllRules}
+              disabled={isSaving}
+              className={`px-6 py-2.5 rounded-xl font-black text-xs shadow-xl transition-all flex items-center space-x-2 ${
+                isSaving
+                  ? 'bg-slate-700 text-slate-400 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 ring-2 ring-emerald-300'
+              }`}
+            >
+              <span>{isSaving ? '⏳ 저장 중...' : '💾 DB에 정책 저장하기'}</span>
+            </button>
           </div>
-        </div>
-      </div>
 
-      {/* 제출된 청약/견적서 목록 */}
-      <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-2xl space-y-4 overflow-x-auto">
-        <h3 className="text-lg font-bold text-amber-400 flex items-center">
-          <span className="mr-2">📋</span> 제출된 광고 청약 및 견적서 관리 목록
-        </h3>
-
-        {proposals.length === 0 ? (
-          <div className="text-center py-8 text-slate-400 text-xs bg-slate-900 rounded-xl border border-slate-750">
-            현재 제출된 청약/견적서 내역이 없습니다.
-          </div>
-        ) : (
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-900 text-slate-300 uppercase border-b border-slate-700">
-              <tr>
-                <th className="p-3">제출일시</th>
-                <th className="p-3">담당자(회사)</th>
-                <th className="p-3">매체구분</th>
-                <th className="p-3 text-amber-300">집행예산</th>
-                <th className="p-3 text-emerald-400">총제공가치</th>
-                <th className="p-3">상태</th>
-                <th className="p-3 text-center">상세보기</th>
-                <th className="p-3 text-center">상태제어</th>
-                <th className="p-3 text-center">삭제</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-700 text-slate-200">
-              {proposals.map(p => (
-                <tr key={p.id}>
-                  <td className="p-3 text-slate-400 font-mono">{p.createdAt}</td>
-                  <td className="p-3 font-bold">{p.userName} <span className="text-slate-400 font-normal">({p.company})</span></td>
-                  <td className="p-3">{p.platformMode === 'BTV' ? 'B tv 단독' : 'IPTV 3사 PRIME'}</td>
-                  <td className="p-3 font-bold text-amber-300">{(p.totalBudget / 10000).toLocaleString()} 만원</td>
-                  <td className="p-3 font-bold text-emerald-400">{p.totalValueStr}</td>
-                  <td className="p-3">
-                    <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${p.status === 'APPROVED' ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : p.status === 'REJECTED' ? 'bg-red-950 text-red-400 border border-red-800' : 'bg-amber-950 text-amber-400 border border-amber-800'}`}>
-                      {p.status === 'APPROVED' ? '승인완료' : p.status === 'REJECTED' ? '청약반려' : '접수검토중'}
-                    </span>
-                  </td>
-                  <td className="p-3 text-center">
-                    <button onClick={() => setSelectedDetailProp(p)} className="bg-slate-700 hover:bg-slate-600 text-xs px-2.5 py-1 rounded font-bold">열람</button>
-                  </td>
-                  <td className="p-3 text-center space-x-1">
-                    <button onClick={() => onUpdateProposalStatus && onUpdateProposalStatus(p.id, 'APPROVED')} className="px-2 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded">승인</button>
-                    <button onClick={() => onUpdateProposalStatus && onUpdateProposalStatus(p.id, 'REJECTED')} className="px-2 py-1 bg-red-800 hover:bg-red-700 text-white font-bold rounded">반려</button>
-                  </td>
-                  <td className="p-3 text-center">
-                    <button onClick={() => onDeleteProposal && onDeleteProposal(p.id)} className="text-red-400 font-bold hover:text-red-300">✕</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-
-      {/* 볼륨 보너스 구간 관리 */}
-      <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-2xl space-y-5">
-        <div className="flex justify-between items-center border-b border-slate-700 pb-3">
-          <h3 className="text-lg font-bold text-white flex items-center">
-            <span className="text-amber-400 mr-2">📊</span> [월 집행 금액 & 집행 기간] 매체별 볼륨 보너스 구간 설정
-          </h3>
-          <button onClick={() => { setDraftBonus(DEFAULT_BONUS_RULES); setIsDirty(true); }} className="bg-red-900/60 hover:bg-red-800 text-red-200 text-xs font-bold px-3 py-1.5 rounded-lg border border-red-700">
-            🔄 기본값으로 재설정
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {['BTV', 'ADDR3'].map(platform => (
-            <div key={platform} className="bg-slate-900 border border-slate-700 p-4 rounded-xl space-y-3 text-xs">
-              <div className="flex justify-between items-center border-b border-slate-800 pb-2">
-                <span className="font-bold text-amber-400 text-sm">
-                  {platform === 'BTV' ? '📺 B tv 단독 볼륨 보너스' : '🌐 IPTV 3사 PRIME 볼륨 보너스'}
-                </span>
-                <button onClick={() => handleBonusChange(platform, 'ADD')} className="bg-amber-600 hover:bg-amber-500 text-white px-3 py-1 rounded-lg font-bold text-xs shadow">
-                  + 구간 추가
-                </button>
+          {/* 🎁 1. 프로모션 혜택 및 우대 조건 관리 섹션 */}
+          <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4 shadow-xl">
+            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+              <div>
+                <h3 className="text-base font-bold text-amber-400 flex items-center space-x-2">
+                  <span>🎁</span>
+                  <span>프로모션 혜택 및 우대 조건 설정</span>
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  견적서 단계에서 선택 가능한 특별 보너스 및 할인 프로모션 정책을 추가하거나 관리합니다.
+                </p>
               </div>
+              <button
+                onClick={handleAddPromo}
+                className="bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-bold px-3 py-1.5 rounded-xl transition-all flex items-center space-x-1"
+              >
+                <span>+</span>
+                <span>프로모션 추가</span>
+              </button>
+            </div>
 
-              {(safeBonusRules[platform] || []).map((rule, idx) => (
-                <div key={idx} className="bg-slate-800 p-3.5 rounded-xl border border-slate-700 space-y-2.5 shadow-md">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-slate-200 text-xs">구간 {idx + 1}</span>
-                    <button onClick={() => handleBonusChange(platform, 'DELETE', idx)} className="text-red-400 font-bold text-xs hover:text-red-300 bg-slate-900 px-2 py-0.5 rounded border border-slate-700">
-                      ✕ 삭제
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {draftPromo.map((promo, idx) => (
+                <div
+                  key={promo.id || idx}
+                  className={`p-4 rounded-xl border transition-all space-y-3 ${
+                    promo.isActive
+                      ? 'bg-slate-950/80 border-amber-500/40'
+                      : 'bg-slate-950/30 border-slate-800 opacity-60'
+                  }`}
+                >
+                  <div className="flex justify-between items-center">
+                    <label className="flex items-center space-x-2 text-xs font-bold cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={promo.isActive ?? true}
+                        onChange={(e) => handlePromoChange(idx, 'isActive', e.target.checked)}
+                        className="rounded accent-amber-500 w-4 h-4"
+                      />
+                      <span className={promo.isActive ? 'text-amber-300' : 'text-slate-500'}>
+                        {promo.isActive ? '활성화 (ON)' : '비활성화 (OFF)'}
+                      </span>
+                    </label>
+
+                    <button
+                      onClick={() => handleDeletePromo(idx)}
+                      className="text-red-400 hover:text-red-300 text-xs font-bold"
+                    >
+                      삭제
                     </button>
                   </div>
-                  <div className="grid grid-cols-3 gap-2 text-slate-300">
+
+                  <div className="space-y-2 text-xs">
                     <div>
-                      <label className="block text-[11px] text-slate-400 font-bold mb-1">최소 월예산</label>
-                      <div className="flex items-center space-x-1">
-                        <input type="number" step={500} value={rule.minMonthlyBudget ? rule.minMonthlyBudget / 10000 : 0} onChange={(e) => handleBonusChange(platform, 'CHANGE', idx, 'minMonthlyBudget', Number(e.target.value) * 10000)} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-2.5 py-1.5 text-right font-bold text-white text-xs" />
-                        <span className="text-[11px] text-slate-400 font-bold whitespace-nowrap">만원</span>
+                      <span className="text-slate-400 block mb-1 font-semibold">프로모션 명칭</span>
+                      <input
+                        type="text"
+                        value={promo.name || ''}
+                        onChange={(e) => handlePromoChange(idx, 'name', e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100 focus:outline-none focus:border-amber-500"
+                        placeholder="예: 신규광고주 런칭 보너스 (+10%)"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <span className="text-slate-400 block mb-1 font-semibold">추가 보너스/할인율 (%)</span>
+                        <input
+                          type="number"
+                          value={promo.rate ?? 0}
+                          onChange={(e) => handlePromoChange(idx, 'rate', Number(e.target.value))}
+                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100 font-mono focus:outline-none focus:border-amber-500"
+                        />
                       </div>
-                    </div>
-                    <div>
-                      <label className="block text-[11px] text-slate-400 font-bold mb-1">최소 기간</label>
-                      <select value={rule.minMonths || 1} onChange={(e) => handleBonusChange(platform, 'CHANGE', idx, 'minMonths', Number(e.target.value))} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-2 py-1.5 font-bold text-white text-xs">
-                        <option value={1}>1개월</option>
-                        <option value={2}>2개월</option>
-                        <option value={3}>3개월</option>
-                        <option value={6}>6개월</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-[11px] text-slate-400 font-bold mb-1">보너스율</label>
-                      <div className="flex items-center space-x-1">
-                        <input type="number" step={5} value={rule.rate || 0} onChange={(e) => handleBonusChange(platform, 'CHANGE', idx, 'rate', Number(e.target.value))} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-2 py-1.5 text-right font-bold text-emerald-400 text-xs" />
-                        <span className="text-[11px] font-bold text-emerald-400">%</span>
+                      <div>
+                        <span className="text-slate-400 block mb-1 font-semibold">적용 설명</span>
+                        <input
+                          type="text"
+                          value={promo.description || ''}
+                          onChange={(e) => handlePromoChange(idx, 'description', e.target.value)}
+                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100 focus:outline-none focus:border-amber-500"
+                          placeholder="혜택 설명"
+                        />
                       </div>
                     </div>
                   </div>
                 </div>
               ))}
             </div>
-          ))}
-        </div>
-      </div>
+          </div>
 
-      {/* 타겟팅 할증 요율 관리 */}
-      <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-2xl space-y-5">
-        <div className="flex justify-between items-center border-b border-slate-700 pb-3">
-          <h3 className="text-lg font-bold text-white flex items-center">
-            <span className="text-red-400 mr-2">⚙️</span> [매체별 타겟팅 할증 요율 관리]
+          {/* 📈 2. 볼륨 보너스 구간 관리 섹션 */}
+          <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4 shadow-xl">
+            <h3 className="text-base font-bold text-sky-400 border-b border-slate-800 pb-3 flex items-center space-x-2">
+              <span>📈</span>
+              <span>집행 청약금액별 볼륨 보너스 구간 설정</span>
+            </h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-950 text-slate-400 uppercase">
+                  <tr>
+                    <th className="p-3">구간 (이상 ~ 미만)</th>
+                    <th className="p-3 text-amber-300">B tv 단독 보너스율 (%)</th>
+                    <th className="p-3 text-sky-300">IPTV 3사(ADDR3) 보너스율 (%)</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800 text-slate-200">
+                  {draftBonus.map((rule, idx) => (
+                    <tr key={idx} className="hover:bg-slate-850">
+                      <td className="p-3 font-mono">
+                        {rule.minBudget?.toLocaleString()}원 ~ {rule.maxBudget ? `${rule.maxBudget?.toLocaleString()}원` : '제한 없음'}
+                      </td>
+                      <td className="p-3">
+                        <input
+                          type="number"
+                          value={rule.btvBonusRate ?? 0}
+                          onChange={(e) => {
+                            const updated = [...draftBonus];
+                            updated[idx].btvBonusRate = Number(e.target.value);
+                            setDraftBonus(updated);
+                          }}
+                          className="w-24 bg-slate-950 border border-slate-700 rounded px-2.5 py-1 font-mono text-amber-300 focus:outline-none focus:border-amber-400"
+                        /> %
+                      </td>
+                      <td className="p-3">
+                        <input
+                          type="number"
+                          value={rule.addr3BonusRate ?? 0}
+                          onChange={(e) => {
+                            const updated = [...draftBonus];
+                            updated[idx].addr3BonusRate = Number(e.target.value);
+                            setDraftBonus(updated);
+                          }}
+                          className="w-24 bg-slate-950 border border-slate-700 rounded px-2.5 py-1 font-mono text-sky-300 focus:outline-none focus:border-sky-400"
+                        /> %
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* ⚡ 3. 타겟팅 및 조건별 할증 요율 설정 */}
+          <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4 shadow-xl">
+            <h3 className="text-base font-bold text-purple-400 border-b border-slate-800 pb-3 flex items-center space-x-2">
+              <span>⚡</span>
+              <span>타겟팅 및 기본 할증 요율 설정</span>
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+              <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
+                <span className="text-slate-400 font-bold block">기본 지역 타겟팅 할증</span>
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="number"
+                    value={draftSurcharge.location ?? 10}
+                    onChange={(e) => setDraftSurcharge({ ...draftSurcharge, location: Number(e.target.value) })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-1.5 font-mono text-white focus:outline-none focus:border-purple-500"
+                  />
+                  <span>%</span>
+                </div>
+              </div>
+
+              <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
+                <span className="text-slate-400 font-bold block">시간대 지정 타겟팅 할증</span>
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="number"
+                    value={draftSurcharge.time ?? 15}
+                    onChange={(e) => setDraftSurcharge({ ...draftSurcharge, time: Number(e.target.value) })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-1.5 font-mono text-white focus:outline-none focus:border-purple-500"
+                  />
+                  <span>%</span>
+                </div>
+              </div>
+
+              <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
+                <span className="text-slate-400 font-bold block">관심사 세그먼트 타겟팅 할증</span>
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="number"
+                    value={draftSurcharge.category ?? 20}
+                    onChange={(e) => setDraftSurcharge({ ...draftSurcharge, category: Number(e.target.value) })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-1.5 font-mono text-white focus:outline-none focus:border-purple-500"
+                  />
+                  <span>%</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 2: 제출된 청약서 목록 관리 */}
+      {activeTab === 'PROPOSALS' && (
+        <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4 shadow-xl">
+          <h3 className="text-base font-bold text-white border-b border-slate-800 pb-3">
+            📋 청약 제출 접수 내역 ({proposals.length}건)
           </h3>
-          <button onClick={() => { setDraftSurcharge(DEFAULT_SURCHARGE_RULES); setIsDirty(true); }} className="bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-600">
-            🔄 기본값으로 재설정
-          </button>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-950 text-slate-400 uppercase">
+                <tr>
+                  <th className="p-3">제출일시</th>
+                  <th className="p-3">캠페인명</th>
+                  <th className="p-3">신청자/회사</th>
+                  <th className="p-3">플랫폼</th>
+                  <th className="p-3">집행예산</th>
+                  <th className="p-3">상태</th>
+                  <th className="p-3 text-right">관리</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800 text-slate-200">
+                {proposals.length === 0 ? (
+                  <tr>
+                    <td colSpan="7" className="p-6 text-center text-slate-500">
+                      접수된 청약 내역이 없습니다.
+                    </td>
+                  </tr>
+                ) : (
+                  proposals.map((prop) => (
+                    <tr key={prop.id} className="hover:bg-slate-850">
+                      <td className="p-3 font-mono text-slate-400">
+                        {prop.createdAt ? new Date(prop.createdAt).toLocaleDateString() : '-'}
+                      </td>
+                      <td className="p-3 font-bold text-white">{prop.campaignName || '미지정'}</td>
+                      <td className="p-3">{prop.userName} ({prop.userCompany})</td>
+                      <td className="p-3 font-bold">
+                        <span className={prop.platformMode === 'BTV' ? 'text-amber-300' : 'text-sky-300'}>
+                          {prop.platformMode === 'BTV' ? 'B tv 단독' : 'IPTV 3사'}
+                        </span>
+                      </td>
+                      <td className="p-3 font-mono font-bold text-emerald-400">
+                        {prop.budget?.toLocaleString()}원
+                      </td>
+                      <td className="p-3">
+                        <select
+                          value={prop.status || 'SUBMITTED'}
+                          onChange={(e) => onUpdateProposalStatus(prop.id, e.target.value)}
+                          className="bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs focus:outline-none"
+                        >
+                          <option value="SUBMITTED">접수완료</option>
+                          <option value="REVIEWING">검토중</option>
+                          <option value="APPROVED">승인완료</option>
+                          <option value="REJECTED">반려</option>
+                        </select>
+                      </td>
+                      <td className="p-3 text-right">
+                        <button
+                          onClick={() => onDeleteProposal(prop.id)}
+                          className="text-red-400 hover:text-red-300 text-xs font-bold"
+                        >
+                          삭제
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
+      )}
 
-        <div className="space-y-6">
-          {['BTV', 'ADDR3'].map(platform => (
-            <div key={platform} className="bg-slate-900 border border-slate-700 p-5 rounded-xl space-y-4">
-              <div className="font-bold text-amber-400 text-sm border-b border-slate-800 pb-2">
-                {platform === 'BTV' ? '📺 B tv 단독 타겟팅 할증 요율' : '🌐 IPTV 3사 PRIME 타겟팅 할증 요율'}
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                {['region', 'time', 'channel'].map(cat => (
-                  <div key={cat} className="bg-slate-800 p-3.5 rounded-xl border border-slate-700 space-y-3 text-xs">
-                    <div className="flex justify-between items-center border-b border-slate-700 pb-2">
-                      <span className="font-bold text-slate-200">{surchargeCategoryNames[cat]}</span>
-                      <button onClick={() => handleSurchargeChange(platform, cat, 'ADD')} className="bg-slate-700 hover:bg-slate-600 text-white px-2 py-0.5 rounded font-bold text-[11px]">
-                        + 추가
+      {/* TAB 3: 사용자 계정 관리 */}
+      {activeTab === 'USERS' && (
+        <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4 shadow-xl">
+          <h3 className="text-base font-bold text-white border-b border-slate-800 pb-3">
+            👥 사용자 가입 승인 및 권한 관리 ({users.length}명)
+          </h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-950 text-slate-400 uppercase">
+                <tr>
+                  <th className="p-3">ID (이메일)</th>
+                  <th className="p-3">이름</th>
+                  <th className="p-3">회사/부서</th>
+                  <th className="p-3">권한</th>
+                  <th className="p-3">승인 상태</th>
+                  <th className="p-3 text-right">관리</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800 text-slate-200">
+                {users.map((u) => (
+                  <tr key={u.id} className="hover:bg-slate-850">
+                    <td className="p-3 font-mono text-slate-300">{u.id}</td>
+                    <td className="p-3 font-bold text-white">{u.name}</td>
+                    <td className="p-3">{u.company}</td>
+                    <td className="p-3">
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                        u.role === 'ADMIN' ? 'bg-purple-900 text-purple-200' : 'bg-slate-800 text-slate-300'
+                      }`}>
+                        {u.role === 'ADMIN' ? '관리자' : '일반사용자'}
+                      </span>
+                    </td>
+                    <td className="p-3">
+                      <button
+                        onClick={() => onStatusChange(u.id, u.status === 'APPROVED' ? 'PENDING' : 'APPROVED')}
+                        className={`px-2.5 py-1 rounded text-xs font-bold transition-all ${
+                          u.status === 'APPROVED'
+                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                            : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                        }`}
+                      >
+                        {u.status === 'APPROVED' ? '승인됨 (Approved)' : '대기중 (Pending)'}
                       </button>
-                    </div>
-
-                    {(((safeSurchargeRules[platform] || {})[cat]) || []).map((rule, idx) => (
-                      <div key={rule.id || idx} className="bg-slate-900 p-2.5 rounded-lg border border-slate-750 space-y-1.5">
-                        <div className="flex items-center space-x-2">
-                          <input type="text" value={rule.name || ''} onChange={(e) => handleSurchargeChange(platform, cat, 'CHANGE', idx, 'name', e.target.value)} className="flex-1 bg-slate-800 border border-slate-600 rounded px-2 py-1 font-bold text-white text-xs" />
-                          {rule.id !== 'ALL' && (
-                            <button onClick={() => handleSurchargeChange(platform, cat, 'DELETE', idx)} className="text-red-400 font-bold px-1 hover:text-red-300">✕</button>
-                          )}
-                        </div>
-                        <div className="flex items-center justify-between text-slate-400 text-[11px]">
-                          <span>할증율:</span>
-                          <div className="flex items-center space-x-1">
-                            <input type="number" step={5} value={rule.rate || 0} onChange={(e) => handleSurchargeChange(platform, cat, 'CHANGE', idx, 'rate', Number(e.target.value))} className="w-16 bg-slate-800 border border-slate-600 rounded px-2 py-0.5 text-right font-bold text-red-400 text-xs" />
-                            <span className="font-bold text-red-400">%</span>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                    </td>
+                    <td className="p-3 text-right">
+                      <button
+                        onClick={() => onDeleteUser(u.id)}
+                        className="text-red-400 hover:text-red-300 text-xs font-bold"
+                      >
+                        계정 삭제
+                      </button>
+                    </td>
+                  </tr>
                 ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* 사용자 계정 목록 표 */}
-      <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-2xl space-y-4 overflow-x-auto">
-        <h3 className="text-lg font-bold text-white mb-2">사용자 승인 및 계정 관리</h3>
-        <table className="w-full text-left text-sm">
-          <thead className="bg-slate-900 text-slate-300 text-xs uppercase border-b border-slate-700">
-            <tr>
-              <th className="p-3">신청일</th>
-              <th className="p-3">담당자(ID)</th>
-              <th className="p-3">회사명</th>
-              <th className="p-3">연락처/이메일</th>
-              <th className="p-3">상태</th>
-              <th className="p-3 text-center">승인 제어</th>
-              <th className="p-3 text-center">삭제</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-700 text-slate-200">
-            {(users || []).map(u => (
-              <tr key={u.id}>
-                <td className="p-3 text-xs text-slate-400 font-mono">{u.createdAt}</td>
-                <td className="p-3 font-bold">{u.name} <span className="text-xs text-slate-400 font-normal">({u.id})</span></td>
-                <td className="p-3 font-bold text-amber-300">{u.company}</td>
-                <td className="p-3 text-xs"><div>{u.phone}</div><div className="text-slate-400">{u.email}</div></td>
-                <td className="p-3">
-                  <span className={`text-xs px-2.5 py-1 rounded-full font-bold ${u.status === 'APPROVED' ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-amber-950 text-amber-400 border border-amber-800'}`}>{u.status}</span>
-                </td>
-                <td className="p-3 text-center space-x-2">
-                  {u.role !== 'ADMIN' && (
-                    <>
-                      <button onClick={() => onStatusChange && onStatusChange(u.id, 'APPROVED')} className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg">승인</button>
-                      <button onClick={() => onStatusChange && onStatusChange(u.id, 'REJECTED')} className="px-3 py-1 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold rounded-lg">거절</button>
-                    </>
-                  )}
-                </td>
-                <td className="p-3 text-center">
-                  {u.role !== 'ADMIN' && <button onClick={() => onDeleteUser && onDeleteUser(u.id)} className="bg-red-900/60 hover:bg-red-800 text-red-200 px-2.5 py-1 text-xs font-bold rounded-lg">삭제</button>}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {/* 청약 상세 모달 */}
-      {selectedDetailProp && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-800 border border-slate-700 w-full max-w-2xl rounded-2xl p-6 space-y-4 shadow-2xl">
-            <div className="flex justify-between items-center border-b border-slate-700 pb-3">
-              <h3 className="font-bold text-amber-400 text-lg">📄 제출 청약 상세 정보</h3>
-              <button onClick={() => setSelectedDetailProp(null)} className="text-slate-400 hover:text-white font-bold text-lg">✕</button>
-            </div>
-            <div className="space-y-2 text-xs text-slate-200">
-              <div><span className="text-slate-400">신청자:</span> {selectedDetailProp.userName} ({selectedDetailProp.company})</div>
-              <div><span className="text-slate-400">연락처/이메일:</span> {selectedDetailProp.phone} / {selectedDetailProp.email}</div>
-              <div><span className="text-slate-400">제출일시:</span> {selectedDetailProp.createdAt}</div>
-              <div><span className="text-slate-400">총 집행 예산:</span> <span className="text-amber-300 font-bold">{(selectedDetailProp.totalBudget / 10000).toLocaleString()} 만원</span></div>
-              <div><span className="text-slate-400">타겟팅 수식:</span> <span className="font-mono text-amber-200">{selectedDetailProp.audienceFormula}</span></div>
-            </div>
-            <div className="pt-3 flex justify-end">
-              <button onClick={() => setSelectedDetailProp(null)} className="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg text-xs font-bold">닫기</button>
-            </div>
+              </tbody>
+            </table>
           </div>
         </div>
       )}
