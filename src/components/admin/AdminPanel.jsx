@@ -1,11 +1,18 @@
 import React, { useState, useEffect } from 'react';
 
+// Firestore 객체({}) 또는 null/undefined를 100% 안전한 배열([])로 변환하는 함수
+const toSafeArray = (data) => {
+  if (Array.isArray(data)) return data;
+  if (data && typeof data === 'object' && data !== null) return Object.values(data);
+  return [];
+};
+
 export default function AdminPanel({
-  users,
-  proposals,
-  bonusRules,
-  surchargeRules,
-  promoRules,
+  users = [],
+  proposals = [],
+  bonusRules = [],
+  surchargeRules = {},
+  promoRules = [],
   onSaveRules,
   onStatusChange,
   onDeleteUser,
@@ -16,39 +23,57 @@ export default function AdminPanel({
   const [activeTab, setActiveTab] = useState('RULES');
   const [isSaving, setIsSaving] = useState(false);
 
-  // 로컬 편집 상태
-  const [draftBonus, setDraftBonus] = useState(bonusRules || []);
-  const [draftSurcharge, setDraftSurcharge] = useState(surchargeRules || {});
-  const [draftPromo, setDraftPromo] = useState(promoRules || []);
+  // DB 형태가 객체든 배열이든 무조건 안전한 배열로 로컬 상태 초기화
+  const [draftBonus, setDraftBonus] = useState(() => toSafeArray(bonusRules));
+  const [draftSurcharge, setDraftSurcharge] = useState(() => surchargeRules || {});
+  const [draftPromo, setDraftPromo] = useState(() => toSafeArray(promoRules));
 
   useEffect(() => {
-    if (bonusRules) setDraftBonus(bonusRules);
-    if (surchargeRules) setDraftSurcharge(surchargeRules);
-    if (promoRules) setDraftPromo(promoRules);
+    setDraftBonus(toSafeArray(bonusRules));
+    if (surchargeRules && typeof surchargeRules === 'object') {
+      setDraftSurcharge(surchargeRules);
+    }
+    setDraftPromo(toSafeArray(promoRules));
   }, [bonusRules, surchargeRules, promoRules]);
+
+  // .map() 실행 전 최종 안전 배열 검증
+  const safeBonus = toSafeArray(draftBonus);
+  const safeSurcharge = draftSurcharge || { location: 10, time: 15, category: 20 };
+  const safePromo = toSafeArray(draftPromo);
+  const safeProposals = toSafeArray(proposals);
+  const safeUsers = toSafeArray(users);
 
   // DB 정책 저장
   const handleSave = async () => {
     setIsSaving(true);
-    const res = await onSaveRules(draftBonus, draftSurcharge, draftPromo);
-    setIsSaving(false);
-    if (res?.success) {
-      alert('💾 DB에 정책이 성공적으로 저장되었습니다!');
-    } else {
-      alert(`저장 실패: ${res?.error || '오류가 발생했습니다.'}`);
+    try {
+      if (typeof onSaveRules === 'function') {
+        const res = await onSaveRules(safeBonus, safeSurcharge, safePromo);
+        if (res?.success) {
+          alert('💾 DB에 정책이 성공적으로 저장되었습니다!');
+        } else {
+          alert(`저장 실패: ${res?.error || '오류가 발생했습니다.'}`);
+        }
+      }
+    } catch (e) {
+      alert(`저장 중 오류: ${e.message}`);
+    } fontally {
+      setIsSaving(false);
     }
   };
 
-  // 프로모션 핸들러
+  // 프로모션 수정 핸들러
   const handlePromoChange = (index, field, value) => {
-    const next = [...draftPromo];
-    next[index] = { ...next[index], [field]: value };
-    setDraftPromo(next);
+    const next = [...safePromo];
+    if (next[index]) {
+      next[index] = { ...next[index], [field]: value };
+      setDraftPromo(next);
+    }
   };
 
   const handleAddPromo = () => {
     setDraftPromo([
-      ...draftPromo,
+      ...safePromo,
       {
         id: `promo_${Date.now()}`,
         name: '신규 프로모션 혜택',
@@ -61,7 +86,7 @@ export default function AdminPanel({
 
   const handleDeletePromo = (index) => {
     if (confirm('해당 프로모션 항목을 삭제하시겠습니까?')) {
-      setDraftPromo(draftPromo.filter((_, i) => i !== index));
+      setDraftPromo(safePromo.filter((_, i) => i !== index));
     }
   };
 
@@ -101,7 +126,7 @@ export default function AdminPanel({
             activeTab === 'PROPOSALS' ? 'bg-purple-600 text-white shadow' : 'bg-slate-900 text-slate-400 hover:text-white'
           }`}
         >
-          📋 제출된 청약 관리 ({proposals?.length || 0})
+          📋 제출된 청약 관리 ({safeProposals.length})
         </button>
         <button
           onClick={() => setActiveTab('USERS')}
@@ -109,7 +134,7 @@ export default function AdminPanel({
             activeTab === 'USERS' ? 'bg-purple-600 text-white shadow' : 'bg-slate-900 text-slate-400 hover:text-white'
           }`}
         >
-          👥 사용자 승인 관리 ({users?.length || 0})
+          👥 사용자 승인 관리 ({safeUsers.length})
         </button>
       </div>
 
@@ -129,7 +154,7 @@ export default function AdminPanel({
             </button>
           </div>
 
-          {/* 🎁 프로모션 혜택 및 우대 조건 관리 (신규 추가 항목) */}
+          {/* 🎁 프로모션 혜택 및 우대 조건 관리 */}
           <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 space-y-4 shadow-xl">
             <div className="flex justify-between items-center border-b border-slate-800 pb-3">
               <div>
@@ -149,23 +174,23 @@ export default function AdminPanel({
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {draftPromo?.length === 0 ? (
+              {safePromo.length === 0 ? (
                 <div className="col-span-2 text-center py-6 text-slate-500 text-xs">
                   등록된 프로모션이 없습니다. [+ 프로모션 추가] 버튼을 클릭해 보세요.
                 </div>
               ) : (
-                draftPromo?.map((promo, idx) => (
-                  <div key={promo.id || idx} className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
+                safePromo.map((promo, idx) => (
+                  <div key={promo?.id || idx} className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
                     <div className="flex justify-between items-center">
                       <label className="flex items-center space-x-2 text-xs text-slate-300 font-bold cursor-pointer">
                         <input
                           type="checkbox"
-                          checked={promo.isActive ?? true}
+                          checked={promo?.isActive ?? true}
                           onChange={(e) => handlePromoChange(idx, 'isActive', e.target.checked)}
                           className="accent-amber-500 w-4 h-4 rounded"
                         />
-                        <span className={promo.isActive ? 'text-amber-300' : 'text-slate-500'}>
-                          {promo.isActive ? '활성화 (ON)' : '비활성화 (OFF)'}
+                        <span className={promo?.isActive ? 'text-amber-300' : 'text-slate-500'}>
+                          {promo?.isActive ? '활성화 (ON)' : '비활성화 (OFF)'}
                         </span>
                       </label>
                       <button
@@ -181,7 +206,7 @@ export default function AdminPanel({
                         <span className="text-slate-400 block mb-1 font-semibold">프로모션 명칭</span>
                         <input
                           type="text"
-                          value={promo.name || ''}
+                          value={promo?.name || ''}
                           onChange={(e) => handlePromoChange(idx, 'name', e.target.value)}
                           className="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-white focus:outline-none focus:border-amber-500"
                           placeholder="예: 신규광고주 런칭 보너스"
@@ -192,7 +217,7 @@ export default function AdminPanel({
                           <span className="text-slate-400 block mb-1 font-semibold">보너스/할인율 (%)</span>
                           <input
                             type="number"
-                            value={promo.rate ?? 0}
+                            value={promo?.rate ?? 0}
                             onChange={(e) => handlePromoChange(idx, 'rate', Number(e.target.value))}
                             className="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-white font-mono focus:outline-none focus:border-amber-500"
                           />
@@ -201,7 +226,7 @@ export default function AdminPanel({
                           <span className="text-slate-400 block mb-1 font-semibold">적용 설명</span>
                           <input
                             type="text"
-                            value={promo.description || ''}
+                            value={promo?.description || ''}
                             onChange={(e) => handlePromoChange(idx, 'description', e.target.value)}
                             className="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-white focus:outline-none focus:border-amber-500"
                             placeholder="혜택 조건 설명"
@@ -230,19 +255,21 @@ export default function AdminPanel({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800 text-slate-200">
-                  {draftBonus?.map((rule, idx) => (
+                  {safeBonus.map((rule, idx) => (
                     <tr key={idx} className="hover:bg-slate-850">
                       <td className="p-3 font-mono">
-                        {rule.minBudget?.toLocaleString()}원 ~ {rule.maxBudget ? `${rule.maxBudget?.toLocaleString()}원` : '제한 없음'}
+                        {rule?.minBudget?.toLocaleString() || 0}원 ~ {rule?.maxBudget ? `${rule.maxBudget.toLocaleString()}원` : '제한 없음'}
                       </td>
                       <td className="p-3">
                         <input
                           type="number"
-                          value={rule.btvBonusRate ?? 0}
+                          value={rule?.btvBonusRate ?? 0}
                           onChange={(e) => {
-                            const next = [...draftBonus];
-                            next[idx].btvBonusRate = Number(e.target.value);
-                            setDraftBonus(next);
+                            const next = [...safeBonus];
+                            if (next[idx]) {
+                              next[idx] = { ...next[idx], btvBonusRate: Number(e.target.value) };
+                              setDraftBonus(next);
+                            }
                           }}
                           className="w-20 bg-slate-950 border border-slate-700 rounded px-2.5 py-1 text-amber-300 font-mono"
                         /> %
@@ -250,11 +277,13 @@ export default function AdminPanel({
                       <td className="p-3">
                         <input
                           type="number"
-                          value={rule.addr3BonusRate ?? 0}
+                          value={rule?.addr3BonusRate ?? 0}
                           onChange={(e) => {
-                            const next = [...draftBonus];
-                            next[idx].addr3BonusRate = Number(e.target.value);
-                            setDraftBonus(next);
+                            const next = [...safeBonus];
+                            if (next[idx]) {
+                              next[idx] = { ...next[idx], addr3BonusRate: Number(e.target.value) };
+                              setDraftBonus(next);
+                            }
                           }}
                           className="w-20 bg-slate-950 border border-slate-700 rounded px-2.5 py-1 text-sky-300 font-mono"
                         /> %
@@ -277,8 +306,8 @@ export default function AdminPanel({
                 <div className="flex items-center space-x-2">
                   <input
                     type="number"
-                    value={draftSurcharge?.location ?? 10}
-                    onChange={(e) => setDraftSurcharge({ ...draftSurcharge, location: Number(e.target.value) })}
+                    value={safeSurcharge?.location ?? 10}
+                    onChange={(e) => setDraftSurcharge({ ...safeSurcharge, location: Number(e.target.value) })}
                     className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-1.5 font-mono text-white"
                   />
                   <span>%</span>
@@ -290,8 +319,8 @@ export default function AdminPanel({
                 <div className="flex items-center space-x-2">
                   <input
                     type="number"
-                    value={draftSurcharge?.time ?? 15}
-                    onChange={(e) => setDraftSurcharge({ ...draftSurcharge, time: Number(e.target.value) })}
+                    value={safeSurcharge?.time ?? 15}
+                    onChange={(e) => setDraftSurcharge({ ...safeSurcharge, time: Number(e.target.value) })}
                     className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-1.5 font-mono text-white"
                   />
                   <span>%</span>
@@ -303,8 +332,8 @@ export default function AdminPanel({
                 <div className="flex items-center space-x-2">
                   <input
                     type="number"
-                    value={draftSurcharge?.category ?? 20}
-                    onChange={(e) => setDraftSurcharge({ ...draftSurcharge, category: Number(e.target.value) })}
+                    value={safeSurcharge?.category ?? 20}
+                    onChange={(e) => setDraftSurcharge({ ...safeSurcharge, category: Number(e.target.value) })}
                     className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-1.5 font-mono text-white"
                   />
                   <span>%</span>
@@ -319,7 +348,7 @@ export default function AdminPanel({
       {activeTab === 'PROPOSALS' && (
         <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 space-y-4 shadow-xl">
           <h3 className="text-sm font-bold text-white border-b border-slate-800 pb-3">
-            📋 청약 제출 접수 내역 ({proposals?.length || 0}건)
+            📋 청약 제출 접수 내역 ({safeProposals.length}건)
           </h3>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
@@ -334,27 +363,27 @@ export default function AdminPanel({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800 text-slate-200">
-                {proposals?.length === 0 ? (
+                {safeProposals.length === 0 ? (
                   <tr>
                     <td colSpan="6" className="p-6 text-center text-slate-500">
                       접수된 청약 내역이 없습니다.
                     </td>
                   </tr>
                 ) : (
-                  proposals?.map((p) => (
-                    <tr key={p.id} className="hover:bg-slate-850">
+                  safeProposals.map((p, idx) => (
+                    <tr key={p?.id || idx} className="hover:bg-slate-850">
                       <td className="p-3 font-mono text-slate-400">
-                        {p.createdAt ? new Date(p.createdAt).toLocaleDateString() : '-'}
+                        {p?.createdAt ? new Date(p.createdAt).toLocaleDateString() : '-'}
                       </td>
-                      <td className="p-3 font-bold text-white">{p.campaignName || '미지정'}</td>
-                      <td className="p-3">{p.userName} ({p.userCompany})</td>
+                      <td className="p-3 font-bold text-white">{p?.campaignName || '미지정'}</td>
+                      <td className="p-3">{p?.userName || '-'} ({p?.userCompany || '-'})</td>
                       <td className="p-3 font-mono font-bold text-emerald-400">
-                        {p.budget?.toLocaleString()}원
+                        {p?.budget?.toLocaleString() || 0}원
                       </td>
                       <td className="p-3">
                         <select
-                          value={p.status || 'SUBMITTED'}
-                          onChange={(e) => onUpdateProposalStatus(p.id, e.target.value)}
+                          value={p?.status || 'SUBMITTED'}
+                          onChange={(e) => onUpdateProposalStatus && onUpdateProposalStatus(p.id, e.target.value)}
                           className="bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs"
                         >
                           <option value="SUBMITTED">접수완료</option>
@@ -365,7 +394,7 @@ export default function AdminPanel({
                       </td>
                       <td className="p-3 text-right">
                         <button
-                          onClick={() => onDeleteProposal(p.id)}
+                          onClick={() => onDeleteProposal && onDeleteProposal(p.id)}
                           className="text-red-400 hover:text-red-300 text-xs font-bold"
                         >
                           삭제
@@ -384,7 +413,7 @@ export default function AdminPanel({
       {activeTab === 'USERS' && (
         <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 space-y-4 shadow-xl">
           <h3 className="text-sm font-bold text-white border-b border-slate-800 pb-3">
-            👥 사용자 가입 승인 및 권한 관리 ({users?.length || 0}명)
+            👥 사용자 가입 승인 및 권한 관리 ({safeUsers.length}명)
           </h3>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
@@ -398,26 +427,26 @@ export default function AdminPanel({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800 text-slate-200">
-                {users?.map((u) => (
-                  <tr key={u.id} className="hover:bg-slate-850">
-                    <td className="p-3 font-mono text-slate-300">{u.id}</td>
-                    <td className="p-3 font-bold text-white">{u.name}</td>
-                    <td className="p-3">{u.company}</td>
+                {safeUsers.map((u, idx) => (
+                  <tr key={u?.id || idx} className="hover:bg-slate-850">
+                    <td className="p-3 font-mono text-slate-300">{u?.id || '-'}</td>
+                    <td className="p-3 font-bold text-white">{u?.name || '-'}</td>
+                    <td className="p-3">{u?.company || '-'}</td>
                     <td className="p-3">
                       <button
-                        onClick={() => onStatusChange(u.id, u.status === 'APPROVED' ? 'PENDING' : 'APPROVED')}
+                        onClick={() => onStatusChange && onStatusChange(u.id, u.status === 'APPROVED' ? 'PENDING' : 'APPROVED')}
                         className={`px-2.5 py-1 rounded text-xs font-bold transition-all ${
-                          u.status === 'APPROVED'
+                          u?.status === 'APPROVED'
                             ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
                             : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
                         }`}
                       >
-                        {u.status === 'APPROVED' ? '승인됨 (Approved)' : '대기중 (Pending)'}
+                        {u?.status === 'APPROVED' ? '승인됨 (Approved)' : '대기중 (Pending)'}
                       </button>
                     </td>
                     <td className="p-3 text-right">
                       <button
-                        onClick={() => onDeleteUser(u.id)}
+                        onClick={() => onDeleteUser && onDeleteUser(u.id)}
                         className="text-red-400 hover:text-red-300 text-xs font-bold"
                       >
                         계정 삭제
