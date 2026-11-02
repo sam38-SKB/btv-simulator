@@ -57,7 +57,7 @@ export default function AdminPanel({
       }
     } catch (e) {
       alert(`저장 중 오류: ${e.message}`);
-    } fontally {
+    } finally {
       setIsSaving(false);
     }
   };
