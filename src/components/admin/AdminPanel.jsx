@@ -28,18 +28,18 @@ export default function AdminPanel({
   useEffect(() => { setDraftPromo(promoRules); }, [promoRules]);
 
   const safeBonusRules = {
-    BTV: (draftBonus && draftBonus.BTV && Array.isArray(draftBonus.BTV)) ? draftBonus.BTV : DEFAULT_BONUS_RULES.BTV,
-    ADDR3: (draftBonus && draftBonus.ADDR3 && Array.isArray(draftBonus.ADDR3)) ? draftBonus.ADDR3 : DEFAULT_BONUS_RULES.ADDR3
+    BTV: (draftBonus && draftBonus.BTV && Array.isArray(draftBonus.BTV)) ? draftBonus.BTV : (DEFAULT_BONUS_RULES?.BTV || []),
+    ADDR3: (draftBonus && draftBonus.ADDR3 && Array.isArray(draftBonus.ADDR3)) ? draftBonus.ADDR3 : (DEFAULT_BONUS_RULES?.ADDR3 || [])
   };
 
   const safeSurchargeRules = {
-    BTV: (draftSurcharge && draftSurcharge.BTV) ? draftSurcharge.BTV : DEFAULT_SURCHARGE_RULES.BTV,
-    ADDR3: (draftSurcharge && draftSurcharge.ADDR3) ? draftSurcharge.ADDR3 : DEFAULT_SURCHARGE_RULES.ADDR3
+    BTV: (draftSurcharge && draftSurcharge.BTV) ? draftSurcharge.BTV : (DEFAULT_SURCHARGE_RULES?.BTV || {}),
+    ADDR3: (draftSurcharge && draftSurcharge.ADDR3) ? draftSurcharge.ADDR3 : (DEFAULT_SURCHARGE_RULES?.ADDR3 || {})
   };
 
   const safePromoRules = {
-    BTV: (draftPromo && draftPromo.BTV && Array.isArray(draftPromo.BTV)) ? draftPromo.BTV : DEFAULT_PROMO_RULES.BTV,
-    ADDR3: (draftPromo && draftPromo.ADDR3 && Array.isArray(draftPromo.ADDR3)) ? draftPromo.ADDR3 : DEFAULT_PROMO_RULES.ADDR3
+    BTV: (draftPromo && draftPromo.BTV && Array.isArray(draftPromo.BTV)) ? draftPromo.BTV : (Array.isArray(draftPromo) ? draftPromo : (DEFAULT_PROMO_RULES?.BTV || [])),
+    ADDR3: (draftPromo && draftPromo.ADDR3 && Array.isArray(draftPromo.ADDR3)) ? draftPromo.ADDR3 : (Array.isArray(draftPromo) ? [] : (DEFAULT_PROMO_RULES?.ADDR3 || []))
   };
 
   const surchargeCategoryNames = {
@@ -48,7 +48,7 @@ export default function AdminPanel({
     channel: '📺 채널 타겟팅'
   };
 
-  // 💾 [저장 버튼] 클릭 이벤트 핸들러 (실행 결과 피드백 알림 포함)
+  // 💾 [저장 버튼] 클릭 이벤트 핸들러
   const handleSaveAll = async () => {
     if (!onSaveRules) {
       alert('⚠️ 저장 함수가 연결되지 않았습니다.');
@@ -101,6 +101,36 @@ export default function AdminPanel({
       platformObj[category] = list;
       updated[platform] = platformObj;
       return updated;
+    });
+  };
+
+  // 프로모션 혜택 변경
+  const handlePromoChange = (platform, actionType, index, field, value) => {
+    setIsDirty(true);
+    setDraftPromo(prev => {
+      if (prev && typeof prev === 'object' && !Array.isArray(prev)) {
+        const updated = { ...prev };
+        const list = [...(updated[platform] || (DEFAULT_PROMO_RULES && DEFAULT_PROMO_RULES[platform]) || [])];
+        if (actionType === 'ADD') {
+          list.push({ id: `promo_${Date.now()}`, name: '신규 프로모션 혜택', rate: 10, description: '혜택 조건 설명', isActive: true });
+        } else if (actionType === 'DELETE') {
+          list.splice(index, 1);
+        } else if (actionType === 'CHANGE') {
+          list[index] = { ...list[index], [field]: value };
+        }
+        updated[platform] = list;
+        return updated;
+      } else {
+        const list = Array.isArray(prev) ? [...prev] : [];
+        if (actionType === 'ADD') {
+          list.push({ id: `promo_${Date.now()}`, name: '신규 프로모션 혜택', rate: 10, description: '혜택 조건 설명', isActive: true });
+        } else if (actionType === 'DELETE') {
+          list.splice(index, 1);
+        } else if (actionType === 'CHANGE') {
+          list[index] = { ...list[index], [field]: value };
+        }
+        return list;
+      }
     });
   };
 
@@ -210,6 +240,88 @@ export default function AdminPanel({
             </tbody>
           </table>
         )}
+      </div>
+
+      {/* 🎁 프로모션 혜택 및 우대 조건 관리 (추가된 원본 스타일 섹션) */}
+      <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-2xl space-y-5">
+        <div className="flex justify-between items-center border-b border-slate-700 pb-3">
+          <h3 className="text-lg font-bold text-white flex items-center">
+            <span className="text-amber-400 mr-2">🎁</span> [매체별 프로모션 혜택 및 우대 조건 관리]
+          </h3>
+          <button onClick={() => { setDraftPromo(DEFAULT_PROMO_RULES); setIsDirty(true); }} className="bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-600">
+            🔄 기본값으로 재설정
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {['BTV', 'ADDR3'].map(platform => (
+            <div key={platform} className="bg-slate-900 border border-slate-700 p-4 rounded-xl space-y-3 text-xs">
+              <div className="flex justify-between items-center border-b border-slate-800 pb-2">
+                <span className="font-bold text-amber-400 text-sm">
+                  {platform === 'BTV' ? '📺 B tv 단독 프로모션' : '🌐 IPTV 3사 PRIME 프로모션'}
+                </span>
+                <button onClick={() => handlePromoChange(platform, 'ADD')} className="bg-amber-600 hover:bg-amber-500 text-white px-3 py-1 rounded-lg font-bold text-xs shadow">
+                  + 프로모션 추가
+                </button>
+              </div>
+
+              {(safePromoRules[platform] || []).map((promo, idx) => (
+                <div key={promo.id || idx} className="bg-slate-800 p-3.5 rounded-xl border border-slate-700 space-y-2.5 shadow-md">
+                  <div className="flex items-center justify-between">
+                    <label className="flex items-center space-x-2 text-xs font-bold cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={promo.isActive ?? true}
+                        onChange={(e) => handlePromoChange(platform, 'CHANGE', idx, 'isActive', e.target.checked)}
+                        className="accent-amber-500 w-4 h-4 rounded"
+                      />
+                      <span className={promo.isActive ? 'text-amber-300' : 'text-slate-500'}>
+                        {promo.isActive ? '활성화 (ON)' : '비활성화 (OFF)'}
+                      </span>
+                    </label>
+                    <button onClick={() => handlePromoChange(platform, 'DELETE', idx)} className="text-red-400 font-bold text-xs hover:text-red-300 bg-slate-900 px-2 py-0.5 rounded border border-slate-700">
+                      ✕ 삭제
+                    </button>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div>
+                      <label className="block text-[11px] text-slate-400 font-bold mb-1">프로모션 명칭</label>
+                      <input
+                        type="text"
+                        value={promo.name || ''}
+                        onChange={(e) => handlePromoChange(platform, 'CHANGE', idx, 'name', e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-600 rounded-lg px-2.5 py-1.5 font-bold text-white text-xs"
+                        placeholder="프로모션 명칭 입력"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[11px] text-slate-400 font-bold mb-1">보너스/할인율 (%)</label>
+                        <input
+                          type="number"
+                          value={promo.rate || 0}
+                          onChange={(e) => handlePromoChange(platform, 'CHANGE', idx, 'rate', Number(e.target.value))}
+                          className="w-full bg-slate-900 border border-slate-600 rounded-lg px-2.5 py-1.5 font-bold text-amber-300 text-xs text-right"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] text-slate-400 font-bold mb-1">적용 설명</label>
+                        <input
+                          type="text"
+                          value={promo.description || ''}
+                          onChange={(e) => handlePromoChange(platform, 'CHANGE', idx, 'description', e.target.value)}
+                          className="w-full bg-slate-900 border border-slate-600 rounded-lg px-2.5 py-1.5 font-bold text-slate-300 text-xs"
+                          placeholder="혜택 조건 설명"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* 볼륨 보너스 구간 관리 */}
