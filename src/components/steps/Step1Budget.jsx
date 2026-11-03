@@ -1,16 +1,16 @@
 import React, { useEffect } from 'react';
 
 export default function Step1BudgetPeriod({ state, actions, onNext }) {
-  // 예산 기본값: 1,000원 (1천원)
-  const DEFAULT_BUDGET = 1000;
+  // 예산 표준권장 기본값: 10,000,000원 (1천만원)
+  const DEFAULT_BUDGET = 10000000;
   // 최대 예산 제한: 50,000,000원 (5천만원)
   const MAX_BUDGET = 50000000;
   // 기본 집행 기간: 1개월
   const DEFAULT_MONTHS = 1;
 
-  // 초기 진입 시 예산이 없거나 기본 범위 초과 시 표준권장 값(1,000원 / 1개월)으로 안전 초기화
+  // 초기 진입 시 예산이 없거나 최대 예산 초과 시 표준권장 값(1,000만원 / 1개월)으로 안전 초기화
   useEffect(() => {
-    if (!state.totalBudget || state.totalBudget < DEFAULT_BUDGET) {
+    if (!state.totalBudget) {
       if (actions.setTotalBudget) actions.setTotalBudget(DEFAULT_BUDGET);
       if (actions.setMonthlyBudget) actions.setMonthlyBudget(DEFAULT_BUDGET);
     } else if (state.totalBudget > MAX_BUDGET) {
@@ -27,7 +27,7 @@ export default function Step1BudgetPeriod({ state, actions, onNext }) {
   const currentMonths = state.months || state.period || DEFAULT_MONTHS;
 
   const handleBudgetChange = (value) => {
-    const numericValue = Math.min(MAX_BUDGET, Math.max(DEFAULT_BUDGET, Number(value) || 0));
+    const numericValue = Math.min(MAX_BUDGET, Math.max(0, Number(value) || 0));
     if (actions.setTotalBudget) actions.setTotalBudget(numericValue);
     if (actions.setMonthlyBudget) actions.setMonthlyBudget(numericValue);
   };
@@ -38,10 +38,10 @@ export default function Step1BudgetPeriod({ state, actions, onNext }) {
     if (actions.setPeriod) actions.setPeriod(monthsValue);
   };
 
-  // 빠른 선택 예산 버튼 프리셋 (1천원 표준권장 ~ 5천만원 MAX)
+  // 빠른 선택 예산 버튼 프리셋 (1,000만원 표준권장 ~ 5,000만원 MAX)
   const budgetPresets = [
-    { label: '1천원 (표준권장)', value: 1000, isRecommended: true },
-    { label: '1,000만원', value: 10000000 },
+    { label: '1,000만원 (표준권장)', value: 10000000, isRecommended: true },
+    { label: '2,000만원', value: 20000000 },
     { label: '3,000만원', value: 30000000 },
     { label: '5,000만원 (MAX)', value: 50000000 }
   ];
@@ -62,7 +62,7 @@ export default function Step1BudgetPeriod({ state, actions, onNext }) {
           <span className="text-red-500 font-extrabold mr-1.5">1.</span> 캠페인 집행 예산 및 기간 설정
         </h3>
         <span className="text-xs bg-amber-500/10 text-amber-300 border border-amber-500/30 px-2.5 py-1 rounded-full font-bold">
-          표준권장: 1천원 / 1개월
+          표준권장: 1,000만원 / 1개월
         </span>
       </div>
 
@@ -74,9 +74,9 @@ export default function Step1BudgetPeriod({ state, actions, onNext }) {
           </label>
           <div className="text-right">
             <span className="text-2xl font-black text-amber-300 font-mono">
-              {currentBudget.toLocaleString()}
+              {(currentBudget / 10000).toLocaleString()}
             </span>
-            <span className="text-xs font-bold text-slate-400 ml-1">원</span>
+            <span className="text-xs font-bold text-slate-400 ml-1">만원 ({currentBudget.toLocaleString()}원)</span>
           </div>
         </div>
 
@@ -84,16 +84,16 @@ export default function Step1BudgetPeriod({ state, actions, onNext }) {
         <div className="space-y-2">
           <input
             type="range"
-            min={1000}
+            min={1000000}
             max={MAX_BUDGET}
-            step={1000}
+            step={1000000}
             value={currentBudget}
             onChange={(e) => handleBudgetChange(e.target.value)}
             className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-amber-500"
           />
           <div className="flex justify-between text-[11px] text-slate-400 font-mono">
-            <span>최소: 1,000원</span>
-            <span className="text-amber-400 font-bold">표준권장: 1천원</span>
+            <span>최소: 100만원</span>
+            <span className="text-amber-400 font-bold">표준권장: 1,000만원</span>
             <span>최대: 5,000만원 (MAX)</span>
           </div>
         </div>
@@ -101,17 +101,17 @@ export default function Step1BudgetPeriod({ state, actions, onNext }) {
         {/* 직접 입력 및 빠른 선택 프리셋 버튼 */}
         <div className="pt-2 space-y-2">
           <div className="flex items-center space-x-2">
-            <span className="text-xs text-slate-400 font-bold">직접 입력:</span>
+            <span className="text-xs text-slate-400 font-bold">직접 입력 (만원):</span>
             <input
               type="number"
-              min={1000}
-              max={MAX_BUDGET}
-              value={currentBudget}
-              onChange={(e) => handleBudgetChange(e.target.value)}
+              min={100}
+              max={5000}
+              value={Math.round(currentBudget / 10000)}
+              onChange={(e) => handleBudgetChange(Number(e.target.value) * 10000)}
               className="flex-1 bg-slate-800 border border-slate-600 rounded-lg px-3 py-1.5 text-xs text-white font-mono font-bold focus:outline-none focus:border-amber-500"
-              placeholder="예산 입력 (원)"
+              placeholder="예산 입력 (만원 단위)"
             />
-            <span className="text-xs text-slate-400 font-bold">원</span>
+            <span className="text-xs text-slate-400 font-bold">만원</span>
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 pt-1">
