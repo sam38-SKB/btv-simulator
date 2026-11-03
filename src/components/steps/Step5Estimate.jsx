@@ -6,9 +6,10 @@ export default function Step5Estimate({ state, actions, calculation, surchargeRu
     else actions.setSelectedPromos([...state.selectedPromos, id]);
   };
 
-  // 선택된 매체(BTV / ADDR3)의 할증 옵션 안전 참조
+  // 선택된 매체(BTV / ADDR3)의 할증 및 프로모션 옵션 가져오기
   const activeSurcharges = surchargeRules[state.platformMode] || surchargeRules;
-  const promoList = promoRules[state.platformMode] || (Array.isArray(promoRules) ? promoRules : []);
+  const rawPromo = promoRules?.[state.platformMode] || (Array.isArray(promoRules) ? promoRules : []);
+  const promoList = Array.isArray(rawPromo) ? rawPromo : (rawPromo && typeof rawPromo === 'object' ? Object.values(rawPromo) : []);
 
   return (
     <div className="bg-slate-800 border border-slate-700 p-6 rounded-2xl shadow-xl space-y-6">
@@ -18,32 +19,32 @@ export default function Step5Estimate({ state, actions, calculation, surchargeRu
         </h3>
       </div>
 
-      {/* 타겟팅 설정 영역 (보내주신 코드 100% 유지) */}
+      {/* 타겟팅 설정 (할증 조건) */}
       <div>
         <label className="text-sm font-bold text-slate-200 block mb-2">⚙️ 타겟팅 설정 (매체별 할증 조건)</label>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
           <div className="bg-slate-900 p-3 rounded-xl border border-slate-700">
             <label className="text-slate-400 block mb-1">📍 지역 타겟팅</label>
             <select value={state.regionTarget} onChange={(e) => actions.setRegionTarget(e.target.value)} className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs text-white font-bold">
-              {(activeSurcharges.region || []).map(r => <option key={r.id} value={r.id}>{r.name} {r.rate > 0 ? `(-${r.rate}%)` : '(-)'}</option>)}
+              {(activeSurcharges?.region || []).map(r => <option key={r.id} value={r.id}>{r.name} {r.rate > 0 ? `(-${r.rate}%)` : '(-)'}</option>)}
             </select>
           </div>
           <div className="bg-slate-900 p-3 rounded-xl border border-slate-700">
             <label className="text-slate-400 block mb-1">⏰ 시간대 타겟팅</label>
             <select value={state.timeTarget} onChange={(e) => actions.setTimeTarget(e.target.value)} className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs text-white font-bold">
-              {(activeSurcharges.time || []).map(t => <option key={t.id} value={t.id}>{t.name} {t.rate > 0 ? `(-${t.rate}%)` : '(-)'}</option>)}
+              {(activeSurcharges?.time || []).map(t => <option key={t.id} value={t.id}>{t.name} {t.rate > 0 ? `(-${t.rate}%)` : '(-)'}</option>)}
             </select>
           </div>
           <div className="bg-slate-900 p-3 rounded-xl border border-slate-700">
             <label className="text-slate-400 block mb-1">📺 채널 타겟팅</label>
             <select value={state.channelTarget} onChange={(e) => actions.setChannelTarget(e.target.value)} className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs text-white font-bold">
-              {(activeSurcharges.channel || []).map(c => <option key={c.id} value={c.id}>{c.name} {c.rate > 0 ? `(-${c.rate}%)` : '(-)'}</option>)}
+              {(activeSurcharges?.channel || []).map(c => <option key={c.id} value={c.id}>{c.name} {c.rate > 0 ? `(-${c.rate}%)` : '(-)'}</option>)}
             </select>
           </div>
         </div>
       </div>
 
-      {/* 프로모션 혜택 및 우대 조건 선택 (관리자 입력 description 우선 반영) */}
+      {/* 프로모션 혜택 및 우대 조건 선택 */}
       <div className="bg-slate-900 p-4 rounded-xl border border-slate-700 text-sm space-y-3">
         <div className="flex justify-between items-center border-b border-slate-800 pb-2">
           <span className="font-bold text-slate-200">🎁 프로모션 혜택 및 우대 조건 선택</span>
@@ -56,7 +57,7 @@ export default function Step5Estimate({ state, actions, calculation, surchargeRu
                 <input type="checkbox" checked={isChecked} onChange={() => togglePromo(p.id)} className="mt-1 w-4 h-4 accent-red-500 rounded cursor-pointer" />
                 <div>
                   <div className="font-bold text-sm text-slate-200">{p.name} {p.rate > 0 && <span className="text-xs text-emerald-400">(+{p.rate}%)</span>}</div>
-                  {/* 관리자 모드 입력 상세설명(p.description) 반영 */}
+                  {/* 관리자 모드에서 입력한 description 필드 바인딩 */}
                   <div className="text-xs text-slate-400 mt-0.5">{p.description || p.desc}</div>
                 </div>
               </label>
@@ -65,7 +66,7 @@ export default function Step5Estimate({ state, actions, calculation, surchargeRu
         </div>
       </div>
 
-      {/* KPI 카드 (보내주신 코드 100% 유지) */}
+      {/* KPI 카드 */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-slate-800 border border-slate-700 p-4.5 rounded-2xl text-center shadow">
           <div className="text-xs text-slate-400 font-bold">총 제공 집행 가치 (총 보너스율 환산)</div>
@@ -84,7 +85,7 @@ export default function Step5Estimate({ state, actions, calculation, surchargeRu
         </div>
       </div>
 
-      {/* 정밀 산출 내역서 표 (보내주신 코드 100% 유지) */}
+      {/* 정밀 산출 내역서 표 */}
       <div className="bg-slate-800 border border-slate-700 p-6 rounded-2xl shadow-xl space-y-4 overflow-x-auto">
         <table className="w-full text-left text-sm">
           <thead className="bg-slate-900 text-slate-300 text-xs uppercase border-b border-slate-700">
