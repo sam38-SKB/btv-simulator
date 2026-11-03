@@ -3,8 +3,8 @@ import { BTV_PACKAGE_BASE_CPV, BTV_FIXED_20S_BASE_CPV, ADDR3_PRIME_PACK_MAP, VID
 
 export function useSimulator(bonusRules, surchargeRules, promoRules) {
   const [currentStep, setCurrentStep] = useState(1);
-  const [monthlyBudget, setMonthlyBudget] = useState(30000000);
-  const [durationMonths, setDurationMonths] = useState(3);
+  const [monthlyBudget, setMonthlyBudget] = useState(10000000);
+  const [durationMonths, setDurationMonths] = useState(1);
   const [platformMode, setPlatformMode] = useState('BTV');
   const [productMode, setProductMode] = useState('PRIME_ESSENTIAL');
   const [videoLength, setVideoLength] = useState('15');
