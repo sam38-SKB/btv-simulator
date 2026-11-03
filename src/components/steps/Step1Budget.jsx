@@ -1,6 +1,6 @@
 import React from 'react';
 
-export default function Step1BudgetPeriod({ state = {}, actions = {}, onNext }) {
+export default function Step1Budget({ state = {}, actions = {}, onNext }) {
   const currentBudget = state.totalBudget || 10000000;
   const currentMonths = state.months || 1;
 
