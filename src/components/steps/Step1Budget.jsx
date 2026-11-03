@@ -1,48 +1,93 @@
 import React, { useEffect } from 'react';
 
 export default function Step1BudgetPeriod({ state, actions, onNext }) {
-  // 예산 및 기간 기본 설정값 (1,000만원 / 1개월 / 최대 5,000만원)
+  // 상수 정의 (1,000만원 ~ 5,000만원 / 1개월)
   const DEFAULT_BUDGET = 10000000; // 1,000만원 (표준권장)
-  const MAX_BUDGET = 50000000;     // 5,000만원 (최대 제한)
+  const MAX_BUDGET = 50000000;     // 5,000만원 (최대)
+  const MIN_BUDGET = 10000000;     // 1,000만원 (최소)
   const DEFAULT_MONTHS = 1;        // 1개월 (표준권장)
 
-  // 최초 1회 마운트 시에만 미설정 항목 기본값 부여 (이후 클릭/입력을 절대 방해하지 않음)
+  // 1. 현재 약정 기간(개월 수) 구하기
+  const currentMonths = Number(
+    state.months ||
+    state.period ||
+    state.executionMonths ||
+    state.contractMonths ||
+    state.duration ||
+    DEFAULT_MONTHS
+  );
+
+  // 2. 현재 총 집행 예산 구하기
+  const getRawTotalBudget = () => {
+    if (state.totalBudget && Number(state.totalBudget) > 0) {
+      return Number(state.totalBudget);
+    }
+    if (state.monthlyBudget && Number(state.monthlyBudget) > 0) {
+      return Number(state.monthlyBudget) * currentMonths;
+    }
+    return DEFAULT_BUDGET;
+  };
+
+  const currentBudget = Math.min(MAX_BUDGET, Math.max(MIN_BUDGET, getRawTotalBudget()));
+
+  // 3. 최초 마운트 시 초과값 정리 및 초기화 (1회만 실행)
   useEffect(() => {
     if (!state.totalBudget && !state.monthlyBudget) {
-      if (actions.setTotalBudget) actions.setTotalBudget(DEFAULT_BUDGET);
-      if (actions.setMonthlyBudget) actions.setMonthlyBudget(DEFAULT_BUDGET);
+      updateBudgetState(DEFAULT_BUDGET, currentMonths);
     } else if (state.totalBudget > MAX_BUDGET) {
-      if (actions.setTotalBudget) actions.setTotalBudget(MAX_BUDGET);
-      if (actions.setMonthlyBudget) actions.setMonthlyBudget(MAX_BUDGET);
+      updateBudgetState(MAX_BUDGET, currentMonths);
     }
 
     if (!state.months && !state.period && !state.executionMonths) {
-      if (actions.setMonths) actions.setMonths(DEFAULT_MONTHS);
-      if (actions.setPeriod) actions.setPeriod(DEFAULT_MONTHS);
-      if (actions.setExecutionMonths) actions.setExecutionMonths(DEFAULT_MONTHS);
+      updateMonthsState(DEFAULT_MONTHS);
     }
-  }, []); // 의존성 배열을 비워 1회만 실행
+  }, []);
 
-  // 현재 선택된 예산 및 기간 값 (안전 추출)
-  const currentBudget = state.totalBudget || state.monthlyBudget || DEFAULT_BUDGET;
-  const currentMonths = state.months || state.period || state.executionMonths || DEFAULT_MONTHS;
+  // 예산 상태 안전 업데이트 헬퍼
+  const updateBudgetState = (totalVal, monthsVal) => {
+    const validTotal = Math.min(MAX_BUDGET, Math.max(MIN_BUDGET, Number(totalVal) || DEFAULT_BUDGET));
+    const validMonths = monthsVal || currentMonths || 1;
 
-  // 예산 변경 이벤트 핸들러
-  const handleBudgetChange = (value) => {
-    const numericValue = Math.min(MAX_BUDGET, Math.max(1000000, Number(value) || 0));
-    if (actions.setTotalBudget) actions.setTotalBudget(numericValue);
-    if (actions.setMonthlyBudget) actions.setMonthlyBudget(numericValue);
+    if (typeof actions.setTotalBudget === 'function') {
+      actions.setTotalBudget(validTotal);
+    }
+    if (typeof actions.setMonthlyBudget === 'function') {
+      // 월 예산 = 총 예산 / 개월 수 (3배 부풀려지는 현상 방지)
+      actions.setMonthlyBudget(Math.round(validTotal / validMonths));
+    }
   };
 
-  // 기간 변경 이벤트 핸들러
-  const handleMonthsChange = (value) => {
-    const monthsValue = Number(value) || 1;
-    if (actions.setMonths) actions.setMonths(monthsValue);
-    if (actions.setPeriod) actions.setPeriod(monthsValue);
-    if (actions.setExecutionMonths) actions.setExecutionMonths(monthsValue);
+  // 개월 수 상태 안전 업데이트 헬퍼
+  const updateMonthsState = (monthsVal) => {
+    const m = Number(monthsVal) || 1;
+    if (typeof actions.setMonths === 'function') {
+      actions.setMonths(m);
+    } else if (typeof actions.setPeriod === 'function') {
+      actions.setPeriod(m);
+    } else if (typeof actions.setExecutionMonths === 'function') {
+      actions.setExecutionMonths(m);
+    } else if (typeof actions.setContractPeriod === 'function') {
+      actions.setContractPeriod(m);
+    } else if (typeof actions.setDuration === 'function') {
+      actions.setDuration(m);
+    }
+
+    // 개월 수 변경 시 총 예산은 유지되도록 월 예산 재조정
+    if (typeof actions.setMonthlyBudget === 'function' && currentBudget > 0) {
+      actions.setMonthlyBudget(Math.round(currentBudget / m));
+    }
   };
 
-  // 빠른 선택 예산 버튼 프리셋 (1,000만원 ~ 5,000만원)
+  // 버튼/슬라이더 클릭 핸들러
+  const handleBudgetChange = (val) => {
+    updateBudgetState(val, currentMonths);
+  };
+
+  const handleMonthsChange = (val) => {
+    updateMonthsState(val);
+  };
+
+  // 예산 버튼 프리셋 (1,000만원 ~ 5,000만원)
   const budgetPresets = [
     { label: '1,000만원 (표준권장)', value: 10000000 },
     { label: '2,000만원', value: 20000000 },
@@ -50,7 +95,7 @@ export default function Step1BudgetPeriod({ state, actions, onNext }) {
     { label: '5,000만원 (MAX)', value: 50000000 }
   ];
 
-  // 기간 빠른 선택 프리셋 (1개월 ~ 6개월)
+  // 기간 버튼 프리셋 (1개월 ~ 6개월)
   const periodPresets = [
     { label: '1개월 (표준권장)', value: 1 },
     { label: '2개월', value: 2 },
@@ -84,11 +129,11 @@ export default function Step1BudgetPeriod({ state, actions, onNext }) {
           </div>
         </div>
 
-        {/* 슬라이더 컨트롤 (100만원 단위 1,000만원 ~ 5,000만원 조절) */}
+        {/* 슬라이더 컨트롤 (최소 1,000만원 ~ 최대 5,000만원) */}
         <div className="space-y-2">
           <input
             type="range"
-            min={10000000}
+            min={MIN_BUDGET}
             max={MAX_BUDGET}
             step={1000000}
             value={currentBudget}
@@ -166,7 +211,7 @@ export default function Step1BudgetPeriod({ state, actions, onNext }) {
                 className={`py-2.5 px-3 rounded-xl text-xs font-bold border transition-all ${
                   isActive
                     ? 'bg-sky-500 text-slate-950 border-sky-400 font-black shadow-lg ring-2 ring-sky-300'
-                    : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700 hover:text-white'
+                    : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-750 hover:text-white'
                 }`}
               >
                 {preset.label}
