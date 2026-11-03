@@ -18,10 +18,7 @@ export function useSimulator(bonusRules, surchargeRules, promoRules) {
   const [timeTarget, setTimeTarget] = useState('ALL');
   const [channelTarget, setChannelTarget] = useState('ALL');
 
-  const [selectedPromos, setSelectedPromos] = useState([
-    'BTV_NEW', 'BTV_SANGSAENG', 'BTV_CONTINUOUS', 'BTV_CROSS_MEDIA', 'BTV_VOD_PLUS',
-    'ADDR3_FIRST', 'ADDR3_3Q_PROMO', 'ADDR3_LONGTERM', 'ADDR3_LARGE_SCALE'
-  ]);
+  const [selectedPromos, setSelectedPromos] = useState([]);
 
   const totalBudget = useMemo(() => (Number(monthlyBudget) || 0) * (Number(durationMonths) || 0), [monthlyBudget, durationMonths]);
 
