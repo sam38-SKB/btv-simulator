@@ -11,8 +11,45 @@ export default function Step5Estimate({ state, actions, calculation, surchargeRu
   const rawPromo = promoRules?.[state.platformMode] || (Array.isArray(promoRules) ? promoRules : []);
   const promoList = Array.isArray(rawPromo) ? rawPromo : (rawPromo && typeof rawPromo === 'object' ? Object.values(rawPromo) : []);
 
-  // 2. 약정 집행 기간 개월 수 안전 추출 (이전 단계 선택값 연동)
-  const executionMonths = state.months || state.period || state.duration || state.contractMonths || state.contractPeriod || state.executionMonths || state.month || calculation?.months || calculation?.period || 1;
+  // 2. 약정 집행 기간 개월 수 안전 탐색 (1단계 선택값 완벽 연동)
+  const getExecutionMonths = () => {
+    // state 내 개월 수/기간 관련 속성 다각도 검사
+    const rawStateVal =
+      state.months ||
+      state.period ||
+      state.executionMonths ||
+      state.periodMonths ||
+      state.selectedMonths ||
+      state.selectedPeriod ||
+      state.contractMonths ||
+      state.contractPeriod ||
+      state.duration ||
+      state.term ||
+      state.campaignMonths ||
+      state.month ||
+      state.monthCount;
+
+    if (rawStateVal && Number(rawStateVal) > 0) {
+      return Number(rawStateVal);
+    }
+
+    // 예산 비율 계산 (총 집행 예산 / 월 집행 예산)
+    const tBudget = state.totalBudget || calculation?.totalBudget || 0;
+    const mBudget = state.monthlyBudget || calculation?.monthlyBudget || 0;
+    if (tBudget > 0 && mBudget > 0) {
+      const computed = Math.round(tBudget / mBudget);
+      if (computed > 0) return computed;
+    }
+
+    // calculation 객체 내 개월 수 검사
+    if (calculation?.months && Number(calculation.months) > 0) return Number(calculation.months);
+    if (calculation?.period && Number(calculation.period) > 0) return Number(calculation.period);
+    if (calculation?.executionMonths && Number(calculation.executionMonths) > 0) return Number(calculation.executionMonths);
+
+    return 1;
+  };
+
+  const executionMonths = getExecutionMonths();
 
   // 3. 'VOD 플러스' 프로모션 선택 여부 감지
   const isVodPlusSelected = (state.selectedPromos || []).some(id => {
@@ -21,7 +58,7 @@ export default function Step5Estimate({ state, actions, calculation, surchargeRu
     return pName.includes('VOD') || String(id).toLowerCase().includes('vod');
   });
 
-  // 4. 하단 산출 내역 표 항목 필터링/적용 (VOD 플러스 선택 시에만 B tv VOD 내역 표출)
+  // 4. 하단 산출 내역 표 항목 필터링 (VOD 플러스 선택 시에만 B tv VOD 내역 표출)
   const rawItems = calculation?.items || [];
   const hasVodInItems = rawItems.some(row => row.name && (row.name.includes('VOD') || row.name.includes('Vod')));
 
@@ -31,7 +68,6 @@ export default function Step5Estimate({ state, actions, calculation, surchargeRu
     return true;
   });
 
-  // VOD 플러스를 선택했으나 기본 items에 VOD 항목이 없는 경우 표에 VOD 보너스 행 적용
   if (isVodPlusSelected && !hasVodInItems) {
     itemsToRender = [
       ...itemsToRender,
@@ -102,7 +138,7 @@ export default function Step5Estimate({ state, actions, calculation, surchargeRu
         </div>
       </div>
 
-      {/* 청약 요약 KPI 카드 (집행 기간 포함 4컬럼 청약 명세 구성) */}
+      {/* 청약 요약 KPI 카드 (약정 집행 기간 동적 반영) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-slate-800 border border-slate-700 p-4.5 rounded-2xl text-center shadow">
           <div className="text-xs text-slate-400 font-bold">📅 약정 집행 기간</div>
