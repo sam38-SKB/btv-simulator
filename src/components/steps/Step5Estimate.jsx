@@ -6,8 +6,9 @@ export default function Step5Estimate({ state, actions, calculation, surchargeRu
     else actions.setSelectedPromos([...state.selectedPromos, id]);
   };
 
-  // 선택된 매체(BTV / ADDR3)의 할증 옵션 가져오기
+  // 선택된 매체(BTV / ADDR3)의 할증 옵션 안전 참조
   const activeSurcharges = surchargeRules[state.platformMode] || surchargeRules;
+  const promoList = promoRules[state.platformMode] || (Array.isArray(promoRules) ? promoRules : []);
 
   return (
     <div className="bg-slate-800 border border-slate-700 p-6 rounded-2xl shadow-xl space-y-6">
@@ -17,6 +18,7 @@ export default function Step5Estimate({ state, actions, calculation, surchargeRu
         </h3>
       </div>
 
+      {/* 타겟팅 설정 영역 (보내주신 코드 100% 유지) */}
       <div>
         <label className="text-sm font-bold text-slate-200 block mb-2">⚙️ 타겟팅 설정 (매체별 할증 조건)</label>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
@@ -41,19 +43,21 @@ export default function Step5Estimate({ state, actions, calculation, surchargeRu
         </div>
       </div>
 
+      {/* 프로모션 혜택 및 우대 조건 선택 (관리자 입력 description 우선 반영) */}
       <div className="bg-slate-900 p-4 rounded-xl border border-slate-700 text-sm space-y-3">
         <div className="flex justify-between items-center border-b border-slate-800 pb-2">
           <span className="font-bold text-slate-200">🎁 프로모션 혜택 및 우대 조건 선택</span>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {(promoRules[state.platformMode] || []).map((p) => {
+          {promoList.map((p) => {
             const isChecked = state.selectedPromos.includes(p.id);
             return (
               <label key={p.id} className={`flex items-start space-x-3 cursor-pointer p-3 rounded-xl border transition ${isChecked ? 'bg-slate-800 border-red-500/80 text-white shadow-md' : 'bg-slate-900/80 border-slate-800 text-slate-400'}`}>
                 <input type="checkbox" checked={isChecked} onChange={() => togglePromo(p.id)} className="mt-1 w-4 h-4 accent-red-500 rounded cursor-pointer" />
                 <div>
                   <div className="font-bold text-sm text-slate-200">{p.name} {p.rate > 0 && <span className="text-xs text-emerald-400">(+{p.rate}%)</span>}</div>
-                  <div className="text-xs text-slate-400 mt-0.5">{p.desc}</div>
+                  {/* 관리자 모드 입력 상세설명(p.description) 반영 */}
+                  <div className="text-xs text-slate-400 mt-0.5">{p.description || p.desc}</div>
                 </div>
               </label>
             );
@@ -61,7 +65,7 @@ export default function Step5Estimate({ state, actions, calculation, surchargeRu
         </div>
       </div>
 
-      {/* KPI 카드 */}
+      {/* KPI 카드 (보내주신 코드 100% 유지) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-slate-800 border border-slate-700 p-4.5 rounded-2xl text-center shadow">
           <div className="text-xs text-slate-400 font-bold">총 제공 집행 가치 (총 보너스율 환산)</div>
@@ -80,7 +84,7 @@ export default function Step5Estimate({ state, actions, calculation, surchargeRu
         </div>
       </div>
 
-      {/* 산출 내역 표 */}
+      {/* 정밀 산출 내역서 표 (보내주신 코드 100% 유지) */}
       <div className="bg-slate-800 border border-slate-700 p-6 rounded-2xl shadow-xl space-y-4 overflow-x-auto">
         <table className="w-full text-left text-sm">
           <thead className="bg-slate-900 text-slate-300 text-xs uppercase border-b border-slate-700">
