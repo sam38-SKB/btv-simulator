@@ -6,20 +6,47 @@ export default function Step5Estimate({ state, actions, calculation, surchargeRu
     else actions.setSelectedPromos([...state.selectedPromos, id]);
   };
 
-  // 선택된 매체(BTV / ADDR3)의 할증 및 프로모션 옵션 가져오기
+  // 1. 선택된 매체(BTV / ADDR3)의 할증 및 프로모션 옵션 가져오기
   const activeSurcharges = surchargeRules[state.platformMode] || surchargeRules;
   const rawPromo = promoRules?.[state.platformMode] || (Array.isArray(promoRules) ? promoRules : []);
   const promoList = Array.isArray(rawPromo) ? rawPromo : (rawPromo && typeof rawPromo === 'object' ? Object.values(rawPromo) : []);
 
-  // VOD 플러스 프로모션 선택 여부 감지 (프로모션 명칭 또는 ID에 VOD가 포함된 항목 체크)
+  // 2. 약정 집행 기간 개월 수 안전 추출 (이전 단계 선택값 연동)
+  const executionMonths = state.months || state.period || state.duration || state.contractMonths || state.contractPeriod || state.executionMonths || state.month || calculation?.months || calculation?.period || 1;
+
+  // 3. 'VOD 플러스' 프로모션 선택 여부 감지
   const isVodPlusSelected = (state.selectedPromos || []).some(id => {
     const p = promoList.find(item => item.id === id);
-    if (!p) return String(id).toLowerCase().includes('vod');
-    return (p.name || '').includes('VOD') || String(p.id).toLowerCase().includes('vod');
+    const pName = p?.name || '';
+    return pName.includes('VOD') || String(id).toLowerCase().includes('vod');
   });
 
-  // 집행 기간 (월 단위)
-  const executionMonths = state.months || state.periodMonths || calculation?.months || 1;
+  // 4. 하단 산출 내역 표 항목 필터링/적용 (VOD 플러스 선택 시에만 B tv VOD 내역 표출)
+  const rawItems = calculation?.items || [];
+  const hasVodInItems = rawItems.some(row => row.name && (row.name.includes('VOD') || row.name.includes('Vod')));
+
+  let itemsToRender = rawItems.filter(row => {
+    const isVodItem = row.name && (row.name.includes('VOD') || row.name.includes('Vod'));
+    if (isVodItem) return isVodPlusSelected;
+    return true;
+  });
+
+  // VOD 플러스를 선택했으나 기본 items에 VOD 항목이 없는 경우 표에 VOD 보너스 행 적용
+  if (isVodPlusSelected && !hasVodInItems) {
+    itemsToRender = [
+      ...itemsToRender,
+      {
+        name: 'B tv VOD 플러스 (보너스)',
+        videoLengthText: '15초/30초 소재',
+        channelPackText: 'B tv 프리미엄 VOD',
+        netPaymentStr: '0 원 (프로모션)',
+        executionValueStr: '보너스 반영',
+        netBonusSummaryText: 'VOD+ 보너스 적용',
+        totalImpressions: '추가 노출 보장',
+        effectiveCPV: '무료'
+      }
+    ];
+  }
 
   return (
     <div className="bg-slate-800 border border-slate-700 p-6 rounded-2xl shadow-xl space-y-6">
@@ -29,7 +56,7 @@ export default function Step5Estimate({ state, actions, calculation, surchargeRu
         </h3>
       </div>
 
-      {/* 타겟팅 설정 (할증 조건) */}
+      {/* 타겟팅 설정 (매체별 할증 조건) */}
       <div>
         <label className="text-sm font-bold text-slate-200 block mb-2">⚙️ 타겟팅 설정 (매체별 할증 조건)</label>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
@@ -75,62 +102,29 @@ export default function Step5Estimate({ state, actions, calculation, surchargeRu
         </div>
       </div>
 
-      {/* 청약 요약 KPI 카드 (집행 기간 포함 4컬럼 구성을 통해 청약 명세서 스타일 강화) */}
+      {/* 청약 요약 KPI 카드 (집행 기간 포함 4컬럼 청약 명세 구성) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-slate-800 border border-slate-700 p-4 rounded-2xl text-center shadow">
+        <div className="bg-slate-800 border border-slate-700 p-4.5 rounded-2xl text-center shadow">
           <div className="text-xs text-slate-400 font-bold">📅 약정 집행 기간</div>
           <div className="text-2xl font-black text-sky-300 mt-1">{executionMonths}개월</div>
-          <div className="text-[11px] text-slate-400 mt-1 font-mono font-bold">캠페인 계약 기간</div>
+          <div className="text-[11px] text-slate-400 mt-1 font-mono font-bold">선택 집행 기간</div>
         </div>
-
-        <div className="bg-slate-800 border border-slate-700 p-4 rounded-2xl text-center shadow">
+        <div className="bg-slate-800 border border-slate-700 p-4.5 rounded-2xl text-center shadow">
           <div className="text-xs text-slate-400 font-bold">💳 총 청약 집행 금액</div>
           <div className="text-2xl font-black text-amber-300 mt-1">{(state.totalBudget / 10000).toLocaleString()} 만원</div>
-          <div className="text-[11px] text-emerald-400 mt-1 font-mono font-bold">제공 가치: {calculation.totalValueStr}</div>
+          <div className="text-[11px] text-emerald-400 mt-1 font-mono font-bold">총 제공가치: {calculation.totalValueStr || '-'}</div>
         </div>
-
-        <div className="bg-slate-800 border border-slate-700 p-4 rounded-2xl text-center shadow">
+        <div className="bg-slate-800 border border-slate-700 p-4.5 rounded-2xl text-center shadow">
           <div className="text-xs text-slate-400 font-bold">🎯 총 보장 노출수</div>
-          <div className="text-2xl font-black text-white mt-1">{calculation.grandTotalImp?.toLocaleString()} 회</div>
-          <div className="text-[11px] text-sky-400 mt-1 font-mono font-bold">실질 CPV: {calculation.avgEffectiveCPV}원</div>
+          <div className="text-2xl font-black text-white mt-1">{(calculation.grandTotalImp || 0).toLocaleString()} 회</div>
+          <div className="text-[11px] text-sky-400 mt-1 font-mono font-bold">실질 CPV: {calculation.avgEffectiveCPV || '-'}원</div>
         </div>
-
-        <div className="bg-slate-800 border border-emerald-500/60 p-4 rounded-2xl text-center shadow">
-          <div className="text-xs text-emerald-400 font-bold">🎁 총 적용 보너스율</div>
-          <div className="text-2xl font-black text-emerald-400 mt-1">총 {(calculation.netBonusRate * 100).toFixed(0)}%</div>
+        <div className="bg-slate-800 border border-emerald-500/60 p-4.5 rounded-2xl text-center shadow">
+          <div className="text-xs text-emerald-400 font-bold">🎁 총 보너스율</div>
+          <div className="text-2xl font-black text-emerald-400 mt-1">총 {((calculation.netBonusRate || 0) * 100).toFixed(0)}%</div>
           <div className="text-xs text-amber-300 font-extrabold mt-1 font-mono">{calculation.netBonusSummary}</div>
         </div>
       </div>
-
-      {/* 🎬 [VOD 플러스 선택 전용] B tv VOD 적용 내역 블록 */}
-      {isVodPlusSelected && (
-        <div className="bg-gradient-to-r from-purple-900/40 via-slate-900 to-purple-950/40 border border-purple-500/50 p-5 rounded-2xl shadow-xl space-y-3">
-          <div className="flex justify-between items-center border-b border-purple-500/30 pb-2.5">
-            <div className="flex items-center space-x-2">
-              <span className="text-lg">🎬</span>
-              <h4 className="text-sm font-extrabold text-purple-200">B tv VOD 플러스 프로모션 특별 적용 내역</h4>
-            </div>
-            <span className="bg-purple-600/30 text-purple-300 border border-purple-400/40 text-[11px] font-bold px-2.5 py-0.5 rounded-full font-mono">
-              VOD PLUS ACTIVE
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
-            <div className="bg-slate-950/60 p-3 rounded-xl border border-purple-900/60 space-y-1">
-              <span className="text-purple-300/80 font-bold block">VOD 타겟팅 가율 혜택</span>
-              <span className="text-white font-mono font-black text-sm">+10% 보너스 구좌 추가</span>
-            </div>
-            <div className="bg-slate-950/60 p-3 rounded-xl border border-purple-900/60 space-y-1">
-              <span className="text-purple-300/80 font-bold block">우대 노출 섹션</span>
-              <span className="text-purple-200 font-bold text-sm">B tv 프리미엄 VOD 전 큐톤</span>
-            </div>
-            <div className="bg-slate-950/60 p-3 rounded-xl border border-purple-900/60 space-y-1">
-              <span className="text-purple-300/80 font-bold block">가치 산출 반영</span>
-              <span className="text-emerald-400 font-mono font-black text-sm">보너스 노출수 자동 합산 적용됨</span>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* 정밀 산출 내역서 표 */}
       <div className="bg-slate-800 border border-slate-700 p-6 rounded-2xl shadow-xl space-y-4 overflow-x-auto">
@@ -147,7 +141,7 @@ export default function Step5Estimate({ state, actions, calculation, surchargeRu
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-700 text-slate-200 font-medium">
-            {calculation.items.map((row, idx) => (
+            {itemsToRender.map((row, idx) => (
               <tr key={idx}>
                 <td className="p-3.5 font-bold text-white">{row.name}</td>
                 <td className="p-3.5">{row.videoLengthText} ({row.channelPackText})</td>
