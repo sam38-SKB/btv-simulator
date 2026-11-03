@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 
 export default function Step1Budget({ state, actions, volInfo, onNext }) {
   // 500만원부터 5,000만원까지 (500만원 단위 10개)
@@ -8,6 +8,16 @@ export default function Step1Budget({ state, actions, volInfo, onNext }) {
   const monthlyBudget = state.monthlyBudget || 10000000;
   const durationMonths = state.durationMonths || 1;
   const totalBudget = state.totalBudget || (monthlyBudget * durationMonths);
+
+  // 최초 진입 시 상위 state가 설정되어 있지 않다면 기본값(1,000만원, 1개월) 세팅
+  useEffect(() => {
+    if (!state.monthlyBudget && actions?.setMonthlyBudget) {
+      actions.setMonthlyBudget(10000000);
+    }
+    if (!state.durationMonths && actions?.setDurationMonths) {
+      actions.setDurationMonths(1);
+    }
+  }, []);
 
   const handleDirectInput = (val) => {
     const num = Number(val);
