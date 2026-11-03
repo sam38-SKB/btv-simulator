@@ -1,46 +1,48 @@
 import React, { useEffect } from 'react';
 
 export default function Step1BudgetPeriod({ state, actions, onNext }) {
-  // 예산 및 기간 표준권장/제약 상수
-  const DEFAULT_BUDGET = 10000000; // 1,000만원 (표준권장 기본값)
+  // 예산 및 기간 기본 설정값 (1,000만원 / 1개월 / 최대 5,000만원)
+  const DEFAULT_BUDGET = 10000000; // 1,000만원 (표준권장)
   const MAX_BUDGET = 50000000;     // 5,000만원 (최대 제한)
-  const MIN_BUDGET = 10000000;     // 1,000만원 (최소 시작값)
-  const DEFAULT_MONTHS = 1;        // 1개월 (표준권장 기본값)
+  const DEFAULT_MONTHS = 1;        // 1개월 (표준권장)
 
-  // 상위 State에 이전 기본값(9,000만원 등)이 남아있을 경우 1,000만원 / 1개월로 즉시 자동 동기화
+  // 최초 1회 마운트 시에만 미설정 항목 기본값 부여 (이후 클릭/입력을 절대 방해하지 않음)
   useEffect(() => {
-    const rawBudget = state.totalBudget || state.monthlyBudget;
-    if (!rawBudget || rawBudget > MAX_BUDGET || rawBudget < MIN_BUDGET) {
+    if (!state.totalBudget && !state.monthlyBudget) {
       if (actions.setTotalBudget) actions.setTotalBudget(DEFAULT_BUDGET);
       if (actions.setMonthlyBudget) actions.setMonthlyBudget(DEFAULT_BUDGET);
+    } else if (state.totalBudget > MAX_BUDGET) {
+      if (actions.setTotalBudget) actions.setTotalBudget(MAX_BUDGET);
+      if (actions.setMonthlyBudget) actions.setMonthlyBudget(MAX_BUDGET);
     }
 
-    if (!state.months && !state.period) {
+    if (!state.months && !state.period && !state.executionMonths) {
       if (actions.setMonths) actions.setMonths(DEFAULT_MONTHS);
       if (actions.setPeriod) actions.setPeriod(DEFAULT_MONTHS);
+      if (actions.setExecutionMonths) actions.setExecutionMonths(DEFAULT_MONTHS);
     }
-  }, [state.totalBudget, state.monthlyBudget, state.months, state.period]);
+  }, []); // 의존성 배열을 비워 1회만 실행
 
-  // 안전 예산 및 기간 변수 (범위 이탈 시 1,000만원 / 1개월 표출)
-  let currentBudget = state.totalBudget || state.monthlyBudget;
-  if (!currentBudget || currentBudget > MAX_BUDGET || currentBudget < MIN_BUDGET) {
-    currentBudget = DEFAULT_BUDGET;
-  }
-  const currentMonths = state.months || state.period || DEFAULT_MONTHS;
+  // 현재 선택된 예산 및 기간 값 (안전 추출)
+  const currentBudget = state.totalBudget || state.monthlyBudget || DEFAULT_BUDGET;
+  const currentMonths = state.months || state.period || state.executionMonths || DEFAULT_MONTHS;
 
+  // 예산 변경 이벤트 핸들러
   const handleBudgetChange = (value) => {
-    const numericValue = Math.min(MAX_BUDGET, Math.max(MIN_BUDGET, Number(value) || DEFAULT_BUDGET));
+    const numericValue = Math.min(MAX_BUDGET, Math.max(1000000, Number(value) || 0));
     if (actions.setTotalBudget) actions.setTotalBudget(numericValue);
     if (actions.setMonthlyBudget) actions.setMonthlyBudget(numericValue);
   };
 
+  // 기간 변경 이벤트 핸들러
   const handleMonthsChange = (value) => {
     const monthsValue = Number(value) || 1;
     if (actions.setMonths) actions.setMonths(monthsValue);
     if (actions.setPeriod) actions.setPeriod(monthsValue);
+    if (actions.setExecutionMonths) actions.setExecutionMonths(monthsValue);
   };
 
-  // 예산 빠른 선택 프리셋 (1,000만원 ~ 5,000만원)
+  // 빠른 선택 예산 버튼 프리셋 (1,000만원 ~ 5,000만원)
   const budgetPresets = [
     { label: '1,000만원 (표준권장)', value: 10000000 },
     { label: '2,000만원', value: 20000000 },
@@ -82,21 +84,21 @@ export default function Step1BudgetPeriod({ state, actions, onNext }) {
           </div>
         </div>
 
-        {/* 슬라이더 컨트롤 (최소 1,000만원 ~ 최대 5,000만원) */}
+        {/* 슬라이더 컨트롤 (100만원 단위 1,000만원 ~ 5,000만원 조절) */}
         <div className="space-y-2">
           <input
             type="range"
-            min={MIN_BUDGET}
+            min={10000000}
             max={MAX_BUDGET}
-            step={5000000}
+            step={1000000}
             value={currentBudget}
             onChange={(e) => handleBudgetChange(e.target.value)}
             className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-amber-500"
           />
           <div className="flex justify-between text-[11px] text-slate-400 font-mono">
-            <span className="text-amber-400 font-bold">표준권장: 1,000만원</span>
+            <span className="text-amber-400 font-bold">1,000만원 (표준)</span>
             <span>3,000만원</span>
-            <span>최대: 5,000만원 (MAX)</span>
+            <span>5,000만원 (MAX)</span>
           </div>
         </div>
 
@@ -125,10 +127,10 @@ export default function Step1BudgetPeriod({ state, actions, onNext }) {
                   key={preset.value}
                   type="button"
                   onClick={() => handleBudgetChange(preset.value)}
-                  className={`py-2 px-3 rounded-lg text-xs font-bold border transition-all ${
+                  className={`py-2.5 px-3 rounded-xl text-xs font-bold border transition-all ${
                     isActive
-                      ? 'bg-amber-500/20 text-amber-300 border-amber-500 shadow-md ring-1 ring-amber-500/40'
-                      : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-750'
+                      ? 'bg-amber-500 text-slate-950 border-amber-400 font-black shadow-lg ring-2 ring-amber-300'
+                      : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700 hover:text-white'
                   }`}
                 >
                   {preset.label}
@@ -163,8 +165,8 @@ export default function Step1BudgetPeriod({ state, actions, onNext }) {
                 onClick={() => handleMonthsChange(preset.value)}
                 className={`py-2.5 px-3 rounded-xl text-xs font-bold border transition-all ${
                   isActive
-                    ? 'bg-sky-500/20 text-sky-300 border-sky-500 shadow-md ring-1 ring-sky-500/40'
-                    : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-750'
+                    ? 'bg-sky-500 text-slate-950 border-sky-400 font-black shadow-lg ring-2 ring-sky-300'
+                    : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700 hover:text-white'
                 }`}
               >
                 {preset.label}
