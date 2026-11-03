@@ -1,74 +1,47 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 
-export default function Step1BudgetPeriod({ state, actions, onNext }) {
-  const DEFAULT_TOTAL_BUDGET = 10000000; // 1,000만원 (표준권장)
-  const MAX_TOTAL_BUDGET = 50000000;     // 5,000만원 (최대)
-  const MIN_TOTAL_BUDGET = 10000000;     // 1,000만원 (최소)
-  const DEFAULT_MONTHS = 1;              // 1개월 (표준권장)
+export default function Step1BudgetPeriod({ state = {}, actions = {}, onNext }) {
+  const DEFAULT_BUDGET = 10000000; // 1,000만원 (표준권장)
+  const MAX_BUDGET = 50000000;     // 5,000만원 (MAX)
+  const MIN_BUDGET = 10000000;     // 1,000만원 (최소)
 
-  // 1. 현재 선택된 약정 기간(개월 수) 구하기
+  // 1. 현재 약정 기간 (개월 수) 안전 추출
   const currentMonths = Number(
-    state?.months ||
-    state?.period ||
-    state?.executionMonths ||
-    state?.contractPeriod ||
-    state?.duration ||
-    DEFAULT_MONTHS
+    state.months || state.period || state.executionMonths || state.duration || 1
   );
 
-  // 2. 현재 총 집행 예산 구하기 (월예산 × 개월 수 중복 계산 방지)
-  const getDisplayTotalBudget = () => {
-    const rawTotal = state?.totalBudget || state?.budget;
-    const rawMonthly = state?.monthlyBudget;
+  // 2. 현재 총 집행 예산 (5천만원 초과 수치나 이탈값 안전 보정)
+  const rawBudget = Number(state.totalBudget || state.budget || state.monthlyBudget || DEFAULT_BUDGET);
+  const currentBudget = Math.min(
+    MAX_BUDGET,
+    Math.max(MIN_BUDGET, rawBudget > MAX_BUDGET ? DEFAULT_BUDGET : rawBudget)
+  );
 
-    if (rawTotal && Number(rawTotal) > 0) {
-      // 상위 상태에서 3배 곱해진 경우 1,000만원~5,000만원 범위로 보정
-      if (rawMonthly && rawTotal === rawMonthly * currentMonths && currentMonths > 1) {
-        return Math.min(MAX_TOTAL_BUDGET, Math.max(MIN_TOTAL_BUDGET, Number(rawMonthly)));
-      }
-      return Math.min(MAX_TOTAL_BUDGET, Math.max(MIN_TOTAL_BUDGET, Number(rawTotal)));
-    }
-    if (rawMonthly && Number(rawMonthly) > 0) {
-      return Math.min(MAX_TOTAL_BUDGET, Math.max(MIN_TOTAL_BUDGET, Number(rawMonthly)));
-    }
-    return DEFAULT_TOTAL_BUDGET;
+  // 3. 예산 변경 이벤트 (월 예산을 총예산 / 개월수로 나누어 3배 부풀림 방지)
+  const handleBudgetChange = (value) => {
+    const targetTotal = Math.min(MAX_BUDGET, Math.max(MIN_BUDGET, Number(value) || DEFAULT_BUDGET));
+    const targetMonthly = Math.round(targetTotal / (currentMonths || 1));
+
+    if (typeof actions.setTotalBudget === 'function') actions.setTotalBudget(targetTotal);
+    if (typeof actions.setBudget === 'function') actions.setBudget(targetTotal);
+    if (typeof actions.setMonthlyBudget === 'function') actions.setMonthlyBudget(targetMonthly);
   };
 
-  const displayTotalBudget = getDisplayTotalBudget();
+  // 4. 기간(개월 수) 변경 이벤트
+  const handleMonthsChange = (value) => {
+    const targetMonths = Number(value) || 1;
+    const targetMonthly = Math.round(currentBudget / targetMonths);
 
-  // 3. 예산 및 기간 통합 안전 업데이트 함수 (월 예산 = 총 예산 / 개월 수)
-  const updateBudgetAndPeriod = (targetTotalBudget, targetMonths) => {
-    const validTotal = Math.min(MAX_TOTAL_BUDGET, Math.max(MIN_TOTAL_BUDGET, Number(targetTotalBudget) || DEFAULT_TOTAL_BUDGET));
-    const validMonths = Number(targetMonths) || 1;
-    const computedMonthly = Math.round(validTotal / validMonths); // 월 예산 분할 계산
+    if (typeof actions.setMonths === 'function') actions.setMonths(targetMonths);
+    if (typeof actions.setPeriod === 'function') actions.setPeriod(targetMonths);
+    if (typeof actions.setExecutionMonths === 'function') actions.setExecutionMonths(targetMonths);
+    if (typeof actions.setDuration === 'function') actions.setDuration(targetMonths);
 
-    // 개월 수 변경 액션 전파
-    if (typeof actions?.setMonths === 'function') actions.setMonths(validMonths);
-    if (typeof actions?.setPeriod === 'function') actions.setPeriod(validMonths);
-    if (typeof actions?.setExecutionMonths === 'function') actions.setExecutionMonths(validMonths);
-    if (typeof actions?.setContractPeriod === 'function') actions.setContractPeriod(validMonths);
-
-    // 예산 변경 액션 전파 (월예산을 정확히 분할하여 전달)
-    if (typeof actions?.setTotalBudget === 'function') actions.setTotalBudget(validTotal);
-    if (typeof actions?.setMonthlyBudget === 'function') actions.setMonthlyBudget(computedMonthly);
-    if (typeof actions?.setBudget === 'function') actions.setBudget(validTotal);
+    // 총 예산 금액이 고정 유지되도록 월 예산 재산출 전달
+    if (typeof actions.setMonthlyBudget === 'function') actions.setMonthlyBudget(targetMonthly);
   };
 
-  // 최초 진입 시 1,000만원 / 1개월 표준 권장값 세팅
-  useEffect(() => {
-    updateBudgetAndPeriod(DEFAULT_TOTAL_BUDGET, DEFAULT_MONTHS);
-  }, []);
-
-  // 버튼 및 입력 핸들러
-  const handleBudgetSelect = (newTotalBudget) => {
-    updateBudgetAndPeriod(newTotalBudget, currentMonths);
-  };
-
-  const handlePeriodSelect = (newMonths) => {
-    updateBudgetAndPeriod(displayTotalBudget, newMonths);
-  };
-
-  // 예산 빠른 선택 프리셋 (1,000만원 ~ 5,000만원)
+  // 예산 버튼 옵션 (1,000만원 ~ 5,000만원)
   const budgetPresets = [
     { label: '1,000만원 (표준권장)', value: 10000000 },
     { label: '2,000만원', value: 20000000 },
@@ -76,7 +49,7 @@ export default function Step1BudgetPeriod({ state, actions, onNext }) {
     { label: '5,000만원 (MAX)', value: 50000000 }
   ];
 
-  // 기간 빠른 선택 프리셋 (1개월 ~ 6개월)
+  // 기간 버튼 옵션 (1개월 ~ 6개월)
   const periodPresets = [
     { label: '1개월 (표준권장)', value: 1 },
     { label: '2개월', value: 2 },
@@ -104,21 +77,21 @@ export default function Step1BudgetPeriod({ state, actions, onNext }) {
           </label>
           <div className="text-right">
             <span className="text-2xl font-black text-amber-300 font-mono">
-              {(displayTotalBudget / 10000).toLocaleString()}
+              {(currentBudget / 10000).toLocaleString()}
             </span>
-            <span className="text-xs font-bold text-slate-400 ml-1">만원 ({displayTotalBudget.toLocaleString()}원)</span>
+            <span className="text-xs font-bold text-slate-400 ml-1">만원 ({currentBudget.toLocaleString()}원)</span>
           </div>
         </div>
 
-        {/* 슬라이더 컨트롤 (최소 1,000만원 ~ 최대 5,000만원) */}
+        {/* 슬라이더 컨트롤 (1,000만원 ~ 5,000만원) */}
         <div className="space-y-2">
           <input
             type="range"
-            min={MIN_TOTAL_BUDGET}
-            max={MAX_TOTAL_BUDGET}
+            min={10000000}
+            max={MAX_BUDGET}
             step={1000000}
-            value={displayTotalBudget}
-            onChange={(e) => handleBudgetSelect(e.target.value)}
+            value={currentBudget}
+            onChange={(e) => handleBudgetChange(e.target.value)}
             className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-amber-500"
           />
           <div className="flex justify-between text-[11px] text-slate-400 font-mono">
@@ -128,7 +101,7 @@ export default function Step1BudgetPeriod({ state, actions, onNext }) {
           </div>
         </div>
 
-        {/* 직접 입력 및 빠른 선택 프리셋 버튼 */}
+        {/* 직접 입력 및 예산 버튼 */}
         <div className="pt-2 space-y-2">
           <div className="flex items-center space-x-2">
             <span className="text-xs text-slate-400 font-bold">직접 입력 (만원):</span>
@@ -137,8 +110,8 @@ export default function Step1BudgetPeriod({ state, actions, onNext }) {
               min={1000}
               max={5000}
               step={100}
-              value={Math.round(displayTotalBudget / 10000)}
-              onChange={(e) => handleBudgetSelect(Number(e.target.value) * 10000)}
+              value={Math.round(currentBudget / 10000)}
+              onChange={(e) => handleBudgetChange(Number(e.target.value) * 10000)}
               className="flex-1 bg-slate-800 border border-slate-600 rounded-lg px-3 py-1.5 text-xs text-white font-mono font-bold focus:outline-none focus:border-amber-500"
               placeholder="예산 입력 (만원 단위)"
             />
@@ -147,12 +120,12 @@ export default function Step1BudgetPeriod({ state, actions, onNext }) {
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 pt-1">
             {budgetPresets.map((preset) => {
-              const isActive = displayTotalBudget === preset.value;
+              const isActive = currentBudget === preset.value;
               return (
                 <button
                   key={preset.value}
                   type="button"
-                  onClick={() => handleBudgetSelect(preset.value)}
+                  onClick={() => handleBudgetChange(preset.value)}
                   className={`py-2.5 px-3 rounded-xl text-xs font-bold border transition-all ${
                     isActive
                       ? 'bg-amber-500 text-slate-950 border-amber-400 font-black shadow-lg ring-2 ring-amber-300'
@@ -188,7 +161,7 @@ export default function Step1BudgetPeriod({ state, actions, onNext }) {
               <button
                 key={preset.value}
                 type="button"
-                onClick={() => handlePeriodSelect(preset.value)}
+                onClick={() => handleMonthsChange(preset.value)}
                 className={`py-2.5 px-3 rounded-xl text-xs font-bold border transition-all ${
                   isActive
                     ? 'bg-sky-500 text-slate-950 border-sky-400 font-black shadow-lg ring-2 ring-sky-300'
