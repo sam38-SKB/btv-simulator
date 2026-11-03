@@ -1,33 +1,35 @@
 import React, { useEffect } from 'react';
 
 export default function Step1BudgetPeriod({ state, actions, onNext }) {
-  // 예산 표준권장 기본값: 10,000,000원 (1천만원)
-  const DEFAULT_BUDGET = 10000000;
-  // 최대 예산 제한: 50,000,000원 (5천만원)
-  const MAX_BUDGET = 50000000;
-  // 기본 집행 기간: 1개월
-  const DEFAULT_MONTHS = 1;
+  // 예산 및 기간 표준권장/제약 상수
+  const DEFAULT_BUDGET = 10000000; // 1,000만원 (표준권장 기본값)
+  const MAX_BUDGET = 50000000;     // 5,000만원 (최대 제한)
+  const MIN_BUDGET = 10000000;     // 1,000만원 (최소 시작값)
+  const DEFAULT_MONTHS = 1;        // 1개월 (표준권장 기본값)
 
-  // 초기 진입 시 예산이 없거나 최대 예산 초과 시 표준권장 값(1,000만원 / 1개월)으로 안전 초기화
+  // 상위 State에 이전 기본값(9,000만원 등)이 남아있을 경우 1,000만원 / 1개월로 즉시 자동 동기화
   useEffect(() => {
-    if (!state.totalBudget) {
+    const rawBudget = state.totalBudget || state.monthlyBudget;
+    if (!rawBudget || rawBudget > MAX_BUDGET || rawBudget < MIN_BUDGET) {
       if (actions.setTotalBudget) actions.setTotalBudget(DEFAULT_BUDGET);
       if (actions.setMonthlyBudget) actions.setMonthlyBudget(DEFAULT_BUDGET);
-    } else if (state.totalBudget > MAX_BUDGET) {
-      if (actions.setTotalBudget) actions.setTotalBudget(MAX_BUDGET);
     }
 
     if (!state.months && !state.period) {
       if (actions.setMonths) actions.setMonths(DEFAULT_MONTHS);
       if (actions.setPeriod) actions.setPeriod(DEFAULT_MONTHS);
     }
-  }, []);
+  }, [state.totalBudget, state.monthlyBudget, state.months, state.period]);
 
-  const currentBudget = state.totalBudget || state.monthlyBudget || DEFAULT_BUDGET;
+  // 안전 예산 및 기간 변수 (범위 이탈 시 1,000만원 / 1개월 표출)
+  let currentBudget = state.totalBudget || state.monthlyBudget;
+  if (!currentBudget || currentBudget > MAX_BUDGET || currentBudget < MIN_BUDGET) {
+    currentBudget = DEFAULT_BUDGET;
+  }
   const currentMonths = state.months || state.period || DEFAULT_MONTHS;
 
   const handleBudgetChange = (value) => {
-    const numericValue = Math.min(MAX_BUDGET, Math.max(0, Number(value) || 0));
+    const numericValue = Math.min(MAX_BUDGET, Math.max(MIN_BUDGET, Number(value) || DEFAULT_BUDGET));
     if (actions.setTotalBudget) actions.setTotalBudget(numericValue);
     if (actions.setMonthlyBudget) actions.setMonthlyBudget(numericValue);
   };
@@ -38,17 +40,17 @@ export default function Step1BudgetPeriod({ state, actions, onNext }) {
     if (actions.setPeriod) actions.setPeriod(monthsValue);
   };
 
-  // 빠른 선택 예산 버튼 프리셋 (1,000만원 표준권장 ~ 5,000만원 MAX)
+  // 예산 빠른 선택 프리셋 (1,000만원 ~ 5,000만원)
   const budgetPresets = [
-    { label: '1,000만원 (표준권장)', value: 10000000, isRecommended: true },
+    { label: '1,000만원 (표준권장)', value: 10000000 },
     { label: '2,000만원', value: 20000000 },
     { label: '3,000만원', value: 30000000 },
     { label: '5,000만원 (MAX)', value: 50000000 }
   ];
 
-  // 기간 프리셋 (1개월 표준권장 ~ 6개월)
+  // 기간 빠른 선택 프리셋 (1개월 ~ 6개월)
   const periodPresets = [
-    { label: '1개월 (표준권장)', value: 1, isRecommended: true },
+    { label: '1개월 (표준권장)', value: 1 },
     { label: '2개월', value: 2 },
     { label: '3개월', value: 3 },
     { label: '6개월', value: 6 }
@@ -80,20 +82,20 @@ export default function Step1BudgetPeriod({ state, actions, onNext }) {
           </div>
         </div>
 
-        {/* 슬라이더 컨트롤 (최대 5,000만원 제한) */}
+        {/* 슬라이더 컨트롤 (최소 1,000만원 ~ 최대 5,000만원) */}
         <div className="space-y-2">
           <input
             type="range"
-            min={1000000}
+            min={MIN_BUDGET}
             max={MAX_BUDGET}
-            step={1000000}
+            step={5000000}
             value={currentBudget}
             onChange={(e) => handleBudgetChange(e.target.value)}
             className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-amber-500"
           />
           <div className="flex justify-between text-[11px] text-slate-400 font-mono">
-            <span>최소: 100만원</span>
             <span className="text-amber-400 font-bold">표준권장: 1,000만원</span>
+            <span>3,000만원</span>
             <span>최대: 5,000만원 (MAX)</span>
           </div>
         </div>
@@ -104,8 +106,9 @@ export default function Step1BudgetPeriod({ state, actions, onNext }) {
             <span className="text-xs text-slate-400 font-bold">직접 입력 (만원):</span>
             <input
               type="number"
-              min={100}
+              min={1000}
               max={5000}
+              step={100}
               value={Math.round(currentBudget / 10000)}
               onChange={(e) => handleBudgetChange(Number(e.target.value) * 10000)}
               className="flex-1 bg-slate-800 border border-slate-600 rounded-lg px-3 py-1.5 text-xs text-white font-mono font-bold focus:outline-none focus:border-amber-500"
@@ -124,7 +127,7 @@ export default function Step1BudgetPeriod({ state, actions, onNext }) {
                   onClick={() => handleBudgetChange(preset.value)}
                   className={`py-2 px-3 rounded-lg text-xs font-bold border transition-all ${
                     isActive
-                      ? 'bg-amber-500/20 text-amber-300 border-amber-500 shadow-md'
+                      ? 'bg-amber-500/20 text-amber-300 border-amber-500 shadow-md ring-1 ring-amber-500/40'
                       : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-750'
                   }`}
                 >
