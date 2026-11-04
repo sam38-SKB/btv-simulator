@@ -11,6 +11,7 @@ import StepIndicator from './components/layout/StepIndicator';
 import LoginView from './components/auth/LoginView';
 import SignupView from './components/auth/SignupView';
 
+import HomeMenuView from './components/home/HomeMenuView';
 import Step1Budget from './components/steps/Step1Budget';
 import Step3Package from './components/steps/Step3Package';
 import Step4Audience from './components/steps/Step4Audience';
@@ -24,8 +25,11 @@ import ProposalModal from './components/common/ProposalModal';
 export default function App() {
   const { users, currentUser, login, signup, logout, updateUserStatus, deleteUser } = useAuth();
   
-  // GNB 메뉴 상태: 'BTV'(실시간 AD+), 'ADDR3'(로딩 VOD), 'INFO'(배너광고), 'NEWS'(매체소식), 'ADMIN'(관리자)
-  const [currentTab, setCurrentTab] = useState('BTV');
+  // 1. GNB 메뉴 초기 상태를 'HOME' 랜딩 화면으로 설정
+  const [currentTab, setCurrentTab] = useState('HOME');
+
+  // 2. 비로그인 유저가 다음 단계 진행 시 복귀할 위치 기억용 상태
+  const [pendingRedirect, setPendingRedirect] = useState(null);
 
   // Firebase DB 연동 상태
   const [proposals, setProposals] = useState([]);
@@ -77,14 +81,22 @@ export default function App() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isProposalOpen, setIsProposalOpen] = useState(false);
 
-  // GNB 메뉴 선택 시 플랫폼 모드 지정 및 1단계 이동
+  // GNB 메뉴 선택 시 처리
   const handleSelectTab = (tab) => {
     setCurrentTab(tab);
-    actions.setCurrentStep(1);
-    if (tab === 'BTV') {
-      actions.setPlatformMode('BTV');
-    } else if (tab === 'ADDR3') {
-      actions.setPlatformMode('ADDR3');
+    if (tab === 'BTV' || tab === 'ADDR3') {
+      actions.setCurrentStep(1);
+      actions.setPlatformMode(tab);
+    }
+  };
+
+  // 비로그인 상태에서 '다음 단계' 이동 시 로그인 창 호출 로직
+  const handleNextWithAuth = (targetStep) => {
+    if (!currentUser) {
+      setPendingRedirect({ tab: currentTab, step: targetStep });
+      setCurrentTab('LOGIN');
+    } else {
+      actions.goToStep(targetStep);
     }
   };
 
@@ -114,10 +126,20 @@ export default function App() {
     }
   };
 
+  // 로그인 처리 (직전 보고 있던 페이지 및 스텝으로 복귀)
   const handleLogin = (id, pw) => {
     const res = login(id, pw);
-    if (!res.success) alert(res.message);
-    else setCurrentTab(res.role === 'ADMIN' ? 'ADMIN' : 'BTV');
+    if (!res.success) {
+      alert(res.message);
+    } else {
+      if (pendingRedirect) {
+        setCurrentTab(pendingRedirect.tab);
+        actions.goToStep(pendingRedirect.step);
+        setPendingRedirect(null);
+      } else {
+        setCurrentTab(res.role === 'ADMIN' ? 'ADMIN' : 'HOME');
+      }
+    }
   };
 
   const handleSignup = (form) => {
@@ -147,12 +169,12 @@ export default function App() {
     }
   };
 
-  if (!currentUser) {
-    return currentTab === 'SIGNUP' ? (
-      <SignupView onSignup={handleSignup} onCancel={() => setCurrentTab('LOGIN')} />
-    ) : (
-      <LoginView onLogin={handleLogin} onGoSignup={() => setCurrentTab('SIGNUP')} />
-    );
+  // 3. 로그인 및 회원가입 전용 독립 화면 처리 (기존 if (!currentUser) 제거)
+  if (currentTab === 'LOGIN') {
+    return <LoginView onLogin={handleLogin} onGoSignup={() => setCurrentTab('SIGNUP')} />;
+  }
+  if (currentTab === 'SIGNUP') {
+    return <SignupView onSignup={handleSignup} onCancel={() => setCurrentTab('LOGIN')} />;
   }
 
   // 테마 글로우 배경 (메뉴별 맞춤 컬러)
@@ -165,7 +187,7 @@ export default function App() {
       ? 'from-purple-500/10 via-slate-900 to-slate-900 border-purple-500/20'
       : currentTab === 'NEWS'
       ? 'from-emerald-500/10 via-slate-900 to-slate-900 border-emerald-500/20'
-      : 'from-purple-900/20 via-slate-900 to-slate-900 border-purple-600/30';
+      : 'from-slate-900 via-slate-900 to-slate-950 border-slate-800';
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans relative flex flex-col">
@@ -175,12 +197,19 @@ export default function App() {
         currentTab={currentTab} 
         onSelectTab={handleSelectTab} 
         onLogout={logout} 
+        onGoLogin={() => setCurrentTab('LOGIN')}
       />
 
       {/* 테마 배경 영역 */}
       <div className={`flex-1 max-w-6xl w-full mx-auto p-6 space-y-6 my-4 rounded-3xl bg-gradient-to-b ${themeGlowClass} border shadow-2xl transition-all duration-300`}>
+        
+        {/* 4. 첫 화면: 메인 랜딩 메뉴 카드 */}
+        {currentTab === 'HOME' && (
+          <HomeMenuView onSelectTab={handleSelectTab} />
+        )}
+
         {/* 관리자 패널 */}
-        {currentTab === 'ADMIN' && (
+        {currentTab === 'ADMIN' && currentUser?.role === 'ADMIN' && (
           <AdminPanel
             users={users}
             proposals={proposals}
@@ -192,7 +221,7 @@ export default function App() {
             onDeleteUser={deleteUser}
             onUpdateProposalStatus={handleUpdateProposalStatus}
             onDeleteProposal={handleDeleteProposal}
-            onBackToDashboard={() => handleSelectTab('BTV')}
+            onBackToDashboard={() => handleSelectTab('HOME')}
           />
         )}
 
@@ -201,7 +230,7 @@ export default function App() {
           <ProductInfoView onGoSimulator={(mode) => handleSelectTab(mode)} />
         )}
 
-        {/* B tv 매체 소식 (신규 메뉴 뷰) */}
+        {/* B tv 매체 소식 */}
         {currentTab === 'NEWS' && (
           <div className="bg-slate-900 border border-slate-700 p-8 rounded-2xl shadow-xl space-y-4 text-center">
             <h3 className="text-xl font-bold text-emerald-400 flex items-center justify-center space-x-2">
@@ -219,7 +248,7 @@ export default function App() {
           <>
             <StepIndicator 
               currentStep={state.currentStep} 
-              goToStep={actions.goToStep} 
+              goToStep={(s) => handleNextWithAuth(s)} 
               currentTab={currentTab}
             />
 
@@ -229,7 +258,7 @@ export default function App() {
                 state={state} 
                 actions={actions} 
                 volInfo={volInfo} 
-                onNext={() => actions.goToStep(2)} 
+                onNext={() => handleNextWithAuth(2)} 
               />
             )}
 
@@ -240,7 +269,7 @@ export default function App() {
                 actions={actions} 
                 calculation={calculation} 
                 onPrev={() => actions.setCurrentStep(1)} 
-                onNext={() => actions.goToStep(3)} 
+                onNext={() => handleNextWithAuth(3)} 
               />
             )}
 
@@ -251,7 +280,7 @@ export default function App() {
                 actions={actions} 
                 audienceFormula={audienceFormula} 
                 onPrev={() => actions.setCurrentStep(2)} 
-                onNext={() => actions.goToStep(4)} 
+                onNext={() => handleNextWithAuth(4)} 
               />
             )}
 
