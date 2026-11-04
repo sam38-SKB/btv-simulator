@@ -28,7 +28,7 @@ export default function Header({ user, currentTab, onSelectTab, onLogout }) {
 
         {/* 🌟 시각적으로 확장되고 눈에 띄는 대형 GNB 메뉴 */}
         <nav className="flex items-center space-x-2 bg-slate-900/90 p-2 rounded-2xl border-2 border-slate-700/80 shadow-2xl text-sm font-extrabold backdrop-blur-md">
-          {/* B tv 단독 광고 버튼 */}
+          {/* 실시간 광고(AD+) 버튼 (기존 BTV) */}
           <button
             onClick={() => onSelectTab('BTV')}
             className={`px-6 py-2.5 rounded-xl transition-all duration-200 flex items-center space-x-2 relative ${
@@ -38,13 +38,13 @@ export default function Header({ user, currentTab, onSelectTab, onLogout }) {
             }`}
           >
             <span className="text-lg">📺</span>
-            <span className="text-sm font-black tracking-tight">B tv 단독 광고</span>
+            <span className="text-sm font-black tracking-tight">실시간 광고(AD+)</span>
             {currentTab === 'BTV' && (
               <span className="w-2 h-2 rounded-full bg-slate-950 animate-ping absolute top-2 right-2" />
             )}
           </button>
 
-          {/* IPTV 3사 광고 버튼 */}
+          {/* 로딩광고(VOD) 버튼 (기존 ADDR3) */}
           <button
             onClick={() => onSelectTab('ADDR3')}
             className={`px-6 py-2.5 rounded-xl transition-all duration-200 flex items-center space-x-2 relative ${
@@ -54,13 +54,13 @@ export default function Header({ user, currentTab, onSelectTab, onLogout }) {
             }`}
           >
             <span className="text-lg">🌐</span>
-            <span className="text-sm font-black tracking-tight">IPTV 3사 광고</span>
+            <span className="text-sm font-black tracking-tight">로딩광고(VOD)</span>
             {currentTab === 'ADDR3' && (
               <span className="w-2 h-2 rounded-full bg-slate-950 animate-ping absolute top-2 right-2" />
             )}
           </button>
 
-          {/* 상품 소개 버튼 */}
+          {/* 배너광고 버튼 (기존 INFO) */}
           <button
             onClick={() => onSelectTab('INFO')}
             className={`px-6 py-2.5 rounded-xl transition-all duration-200 flex items-center space-x-2 relative ${
@@ -70,7 +70,26 @@ export default function Header({ user, currentTab, onSelectTab, onLogout }) {
             }`}
           >
             <span className="text-lg">📖</span>
-            <span className="text-sm font-black tracking-tight">상품 소개</span>
+            <span className="text-sm font-black tracking-tight">배너광고</span>
+            {currentTab === 'INFO' && (
+              <span className="w-2 h-2 rounded-full bg-slate-950 animate-ping absolute top-2 right-2" />
+            )}
+          </button>
+
+          {/* B tv 매체 소식 버튼 (신규 추가) */}
+          <button
+            onClick={() => onSelectTab('NEWS')}
+            className={`px-6 py-2.5 rounded-xl transition-all duration-200 flex items-center space-x-2 relative ${
+              currentTab === 'NEWS' 
+                ? 'bg-gradient-to-r from-emerald-400 via-teal-500 to-emerald-600 text-slate-950 font-black shadow-lg shadow-emerald-500/30 scale-105 ring-2 ring-emerald-300' 
+                : 'text-slate-300 hover:text-white hover:bg-slate-800/90 hover:scale-102'
+            }`}
+          >
+            <span className="text-lg">📰</span>
+            <span className="text-sm font-black tracking-tight">B tv 매체 소식</span>
+            {currentTab === 'NEWS' && (
+              <span className="w-2 h-2 rounded-full bg-slate-950 animate-ping absolute top-2 right-2" />
+            )}
           </button>
         </nav>
 

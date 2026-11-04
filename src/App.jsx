@@ -24,7 +24,7 @@ import ProposalModal from './components/common/ProposalModal';
 export default function App() {
   const { users, currentUser, login, signup, logout, updateUserStatus, deleteUser } = useAuth();
   
-  // GNB 메뉴 상태: 'BTV', 'ADDR3', 'INFO', 'ADMIN'
+  // GNB 메뉴 상태: 'BTV'(실시간 AD+), 'ADDR3'(로딩 VOD), 'INFO'(배너광고), 'NEWS'(매체소식), 'ADMIN'(관리자)
   const [currentTab, setCurrentTab] = useState('BTV');
 
   // Firebase DB 연동 상태
@@ -77,7 +77,7 @@ export default function App() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isProposalOpen, setIsProposalOpen] = useState(false);
 
-  // GNB 메뉴 선택 시 플랫폼 모드 자동 지정 및 1단계 이동
+  // GNB 메뉴 선택 시 플랫폼 모드 지정 및 1단계 이동
   const handleSelectTab = (tab) => {
     setCurrentTab(tab);
     actions.setCurrentStep(1);
@@ -155,7 +155,7 @@ export default function App() {
     );
   }
 
-  // 테마 글로우 배경
+  // 테마 글로우 배경 (메뉴별 맞춤 컬러)
   const themeGlowClass = 
     currentTab === 'BTV' 
       ? 'from-amber-500/10 via-slate-900 to-slate-900 border-amber-500/20' 
@@ -163,6 +163,8 @@ export default function App() {
       ? 'from-sky-500/10 via-slate-900 to-slate-900 border-sky-500/20'
       : currentTab === 'INFO'
       ? 'from-purple-500/10 via-slate-900 to-slate-900 border-purple-500/20'
+      : currentTab === 'NEWS'
+      ? 'from-emerald-500/10 via-slate-900 to-slate-900 border-emerald-500/20'
       : 'from-purple-900/20 via-slate-900 to-slate-900 border-purple-600/30';
 
   return (
@@ -177,6 +179,7 @@ export default function App() {
 
       {/* 테마 배경 영역 */}
       <div className={`flex-1 max-w-6xl w-full mx-auto p-6 space-y-6 my-4 rounded-3xl bg-gradient-to-b ${themeGlowClass} border shadow-2xl transition-all duration-300`}>
+        {/* 관리자 패널 */}
         {currentTab === 'ADMIN' && (
           <AdminPanel
             users={users}
@@ -193,10 +196,25 @@ export default function App() {
           />
         )}
 
+        {/* 배너광고 (기존 상품 소개) */}
         {currentTab === 'INFO' && (
           <ProductInfoView onGoSimulator={(mode) => handleSelectTab(mode)} />
         )}
 
+        {/* B tv 매체 소식 (신규 메뉴 뷰) */}
+        {currentTab === 'NEWS' && (
+          <div className="bg-slate-900 border border-slate-700 p-8 rounded-2xl shadow-xl space-y-4 text-center">
+            <h3 className="text-xl font-bold text-emerald-400 flex items-center justify-center space-x-2">
+              <span>📰</span>
+              <span>B tv 매체 소식</span>
+            </h3>
+            <p className="text-sm text-slate-400">
+              최신 B tv 광고 리포트, 월별 매체 상품 업데이트 및 프로모션 공지사항이 게재될 영역입니다.
+            </p>
+          </div>
+        )}
+
+        {/* 실시간 광고(AD+) & 로딩광고(VOD) 시뮬레이터 스텝 */}
         {(currentTab === 'BTV' || currentTab === 'ADDR3') && (
           <>
             <StepIndicator 
@@ -215,7 +233,7 @@ export default function App() {
               />
             )}
 
-            {/* Step 2: 상품 & 보너스 (기존 Step3Package) */}
+            {/* Step 2: 상품 & 보너스 (Step3Package) */}
             {state.currentStep === 2 && (
               <Step3Package 
                 state={state} 
@@ -226,7 +244,7 @@ export default function App() {
               />
             )}
 
-            {/* Step 3: 타겟팅 (기존 Step4Audience) */}
+            {/* Step 3: 타겟팅 (Step4Audience) */}
             {state.currentStep === 3 && (
               <Step4Audience 
                 state={state} 
@@ -237,7 +255,7 @@ export default function App() {
               />
             )}
 
-            {/* Step 4: 최종 견적 (기존 Step5Estimate) */}
+            {/* Step 4: 최종 견적 (Step5Estimate) */}
             {state.currentStep === 4 && (
               <Step5Estimate 
                 state={state} 
