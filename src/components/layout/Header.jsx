@@ -15,13 +15,13 @@ export default function Header({ user, currentTab, onSelectTab, onLogout }) {
           </div>
           <div>
             <div className="font-black text-white text-sm leading-tight tracking-tight flex items-center space-x-1">
-              <span>B tv Simulator</span>
+              <span>B tv 광고 안내</span>
               <span className="text-[9px] font-bold bg-gradient-to-r from-red-600 to-orange-500 text-white px-1.5 py-0.2 rounded-full shadow-sm uppercase tracking-wider">
                 AGENT
               </span>
             </div>
             <div className="text-[10px] text-slate-400 font-semibold">
-              SK broadband AD Planner
+               상품 문의 및 견적 산출 시스템
             </div>
           </div>
         </div>
