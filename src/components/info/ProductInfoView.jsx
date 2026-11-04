@@ -6,7 +6,7 @@ export default function ProductInfoView({ onGoSimulator }) {
       {/* 헤더 배너 */}
       <div className="bg-gradient-to-r from-slate-800 via-purple-950 to-slate-800 border border-slate-700 p-8 rounded-3xl shadow-2xl text-center space-y-3">
         <span className="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">
-          SK broadband B tv AD Platform
+          B tv 광고 견적 산출 시스템
         </span>
         <h2 className="text-3xl font-black text-white">B tv & IPTV 3사 광고 상품 안내</h2>
         <p className="text-slate-300 text-sm max-w-2xl mx-auto leading-relaxed">
@@ -24,7 +24,7 @@ export default function ProductInfoView({ onGoSimulator }) {
               <span className="bg-amber-500/20 text-amber-300 text-xs font-bold px-2.5 py-1 rounded-lg">700만 가구 단독</span>
             </div>
             <div>
-              <h3 className="text-xl font-bold text-amber-400">B tv 단독 광고</h3>
+              <h3 className="text-xl font-bold text-amber-400">B tv 광고</h3>
               <p className="text-xs text-slate-400 mt-1">SK브로드밴드 B tv 가입자 대상 정밀 타겟팅 및 오리지널 광고 패키지</p>
             </div>
             <ul className="space-y-2 text-xs text-slate-300 border-t border-slate-700/60 pt-4">

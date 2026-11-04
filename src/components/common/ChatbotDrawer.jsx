@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 
 export default function ChatbotDrawer({ isOpen, onClose, onApplyRecommendation }) {
   const [messages, setMessages] = useState([
-    { id: '1', sender: 'agent', text: '안녕하세요! B tv 단독 및 IPTV 3사 Addr.TV PRIME 정밀 정책 계산 Agent입니다. 👋\n\n문의 사항이 있으시면 말씀해 주세요!' }
+    { id: '1', sender: 'agent', text: '안녕하세요! B tv 광고 상품에 대해 궁금하신 점 있으신가요? 👋\n\n문의 사항이 있으시면 말씀해 주세요!' }
   ]);
   const [input, setInput] = useState('');
   const chatEndRef = useRef(null);
