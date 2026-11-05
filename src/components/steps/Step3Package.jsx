@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { 
   BTV_PACKAGE_BASE_CPV, 
   BTV_FIXED_20S_BASE_CPV, 
@@ -53,8 +53,28 @@ export default function Step3Package({ state, actions, calculation, onPrev, onNe
   // 실시간 BTV 모드 전용 소재 영상 길이
   const btvVideoLengths = ['15', '20', '30', '45', '60'];
 
-  // 현재 선택된 VOD 광고 유형 (기본값: PRE_ROLL)
+  // 현재 선택된 VOD 광고 유형
   const currentVodType = state.productMode || state.vodType || 'PRE_ROLL';
+
+  // 🌟 로딩광고(ADDR3) 처음 진입 시 VOD Pre-roll 및 15초 이하 기본 세팅
+  useEffect(() => {
+    if (!isBtv) {
+      const validVodTypes = ['PRE_ROLL', 'POST_ROLL', 'MOBILE_BTV'];
+      
+      // VOD 유형이 미정되거나 지정값이 없을 경우 PRE_ROLL로 초기화
+      if (!validVodTypes.includes(state.productMode)) {
+        if (actions.setProductMode) actions.setProductMode('PRE_ROLL');
+        if (actions.setVodType) actions.setVodType('PRE_ROLL');
+        if (actions.setVideoLength) actions.setVideoLength('15');
+      } else {
+        // 선택된 VOD 유형에 맞춰 유효한 길이가 아닌 경우 기본 15초(또는 첫번째 길이) 세팅
+        const validLengths = (VOD_LENGTH_OPTIONS[currentVodType] || []).map(o => o.id);
+        if (!validLengths.includes(String(state.videoLength))) {
+          if (actions.setVideoLength) actions.setVideoLength(validLengths[0] || '15');
+        }
+      }
+    }
+  }, [isBtv, state.productMode, state.videoLength, currentVodType, actions]);
 
   // VOD 유형 클릭 핸들러 (유형 변경 시 해당 유형의 첫 번째 영상 길이를 자동 선택)
   const handleSelectVodType = (vodId) => {
@@ -66,7 +86,7 @@ export default function Step3Package({ state, actions, calculation, onPrev, onNe
   };
 
   // VOD 과금 방식 및 단가 연산 (요약 카드 표기용)
-  const vodPriceData = React.useMemo(() => {
+  const vodPriceData = useMemo(() => {
     const bonusRate = calculation?.bonusRate || 0;
     
     if (currentVodType === 'POST_ROLL') {
@@ -244,7 +264,7 @@ export default function Step3Package({ state, actions, calculation, onPrev, onNe
         )}
       </div>
 
-      {/* 4. 선택한 조건 및 산출 단가 요약 카드 (CPV / CPM 자동 변환) */}
+      {/* 4. 선택한 조건 및 산출 단가 요약 카드 */}
       <div className="bg-slate-950 p-4 rounded-xl border border-slate-700 flex flex-col sm:flex-row justify-between items-start sm:items-center text-sm gap-3">
         <div>
           <span className="text-slate-400">선택한 조건:</span>{' '}
