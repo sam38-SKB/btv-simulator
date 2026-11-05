@@ -67,9 +67,8 @@ export default function AdminPanel({
       }
     } catch (err) {
       alert(`❌ [저장 오류] 예외가 발생했습니다:\n${err.message}`);
-    } finally {
-      setIsSaving(false);
-    }
+    } font
+    setIsSaving(false);
   };
 
   // 보너스 변경
@@ -217,7 +216,9 @@ export default function AdminPanel({
                 <tr key={p.id}>
                   <td className="p-3 text-slate-400 font-mono">{p.createdAt}</td>
                   <td className="p-3 font-bold">{p.userName} <span className="text-slate-400 font-normal">({p.company})</span></td>
-                  <td className="p-3">{p.platformMode === 'BTV' ? 'B tv 단독' : 'IPTV 3사 PRIME'}</td>
+                  <td className="p-3 font-bold text-amber-300">
+                    {p.platformMode === 'BTV' ? '📺 실시간 광고(AD+)' : '🎬 로딩광고(VOD)'}
+                  </td>
                   <td className="p-3 font-bold text-amber-300">{(p.totalBudget / 10000).toLocaleString()} 만원</td>
                   <td className="p-3 font-bold text-emerald-400">{p.totalValueStr}</td>
                   <td className="p-3">
@@ -242,7 +243,7 @@ export default function AdminPanel({
         )}
       </div>
 
-      {/* 🎁 프로모션 혜택 및 우대 조건 관리 (추가된 원본 스타일 섹션) */}
+      {/* 🎁 프로모션 혜택 및 우대 조건 관리 */}
       <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-2xl space-y-5">
         <div className="flex justify-between items-center border-b border-slate-700 pb-3">
           <h3 className="text-lg font-bold text-white flex items-center">
@@ -258,7 +259,7 @@ export default function AdminPanel({
             <div key={platform} className="bg-slate-900 border border-slate-700 p-4 rounded-xl space-y-3 text-xs">
               <div className="flex justify-between items-center border-b border-slate-800 pb-2">
                 <span className="font-bold text-amber-400 text-sm">
-                  {platform === 'BTV' ? '📺 B tv 단독 프로모션' : '🌐 IPTV 3사 PRIME 프로모션'}
+                  {platform === 'BTV' ? '📺 실시간 광고(AD+) 프로모션' : '🎬 로딩광고(VOD) 프로모션'}
                 </span>
                 <button onClick={() => handlePromoChange(platform, 'ADD')} className="bg-amber-600 hover:bg-amber-500 text-white px-3 py-1 rounded-lg font-bold text-xs shadow">
                   + 프로모션 추가
@@ -340,7 +341,7 @@ export default function AdminPanel({
             <div key={platform} className="bg-slate-900 border border-slate-700 p-4 rounded-xl space-y-3 text-xs">
               <div className="flex justify-between items-center border-b border-slate-800 pb-2">
                 <span className="font-bold text-amber-400 text-sm">
-                  {platform === 'BTV' ? '📺 B tv 단독 볼륨 보너스' : '🌐 IPTV 3사 PRIME 볼륨 보너스'}
+                  {platform === 'BTV' ? '📺 실시간 광고(AD+) 볼륨 보너스' : '🎬 로딩광고(VOD) 볼륨 보너스'}
                 </span>
                 <button onClick={() => handleBonusChange(platform, 'ADD')} className="bg-amber-600 hover:bg-amber-500 text-white px-3 py-1 rounded-lg font-bold text-xs shadow">
                   + 구간 추가
@@ -402,7 +403,7 @@ export default function AdminPanel({
           {['BTV', 'ADDR3'].map(platform => (
             <div key={platform} className="bg-slate-900 border border-slate-700 p-5 rounded-xl space-y-4">
               <div className="font-bold text-amber-400 text-sm border-b border-slate-800 pb-2">
-                {platform === 'BTV' ? '📺 B tv 단독 타겟팅 할증 요율' : '🌐 IPTV 3사 PRIME 타겟팅 할증 요율'}
+                {platform === 'BTV' ? '📺 실시간 광고(AD+) 타겟팅 할증 요율' : '🎬 로딩광고(VOD) 타겟팅 할증 요율'}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
