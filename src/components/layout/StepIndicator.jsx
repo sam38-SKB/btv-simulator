@@ -29,11 +29,14 @@ export default function StepIndicator({ currentStep, goToStep, currentTab }) {
       <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
         <div className="flex items-center space-x-2.5">
           <span className={`text-xs font-black px-3 py-1 rounded-full border ${badgeStyle} flex items-center space-x-1.5`}>
-            <span>{isBtv ? '📺' : '🌐'}</span>
-            <span>{isBtv ? 'B tv 단독 광고 모드' : 'IPTV 3사 통합 ADDR3 모드'}</span>
+            <span>{isBtv ? '📺' : '🎬'}</span>
+            <span>{isBtv ? '실시간 광고(AD+) 모드' : '로딩광고(VOD) 모드'}</span>
           </span>
           <span className="text-xs text-slate-400 font-medium hidden sm:inline">
-            {isBtv ? 'SK브로드밴드 가입자 700만 대상 단독 패키지' : 'SKB · KT · LGU+ 2,166만 가구 Addressable TV'}
+            {isBtv 
+              ? '100여개 실시간 제휴채널 대상 오디언스 정밀 타깃 노출' 
+              : 'VOD 시청 직전 스킵 없는 100% 몰입 노출'
+            }
           </span>
         </div>
         <div className="text-xs font-mono font-semibold text-slate-400">
