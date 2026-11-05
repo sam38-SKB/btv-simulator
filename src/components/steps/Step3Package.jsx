@@ -65,6 +65,44 @@ export default function Step3Package({ state, actions, calculation, onPrev, onNe
     if (actions.setVideoLength) actions.setVideoLength(defaultLength);
   };
 
+  // VOD 과금 방식 및 단가 연산 (요약 카드 표기용)
+  const vodPriceData = React.useMemo(() => {
+    const bonusRate = calculation?.bonusRate || 0;
+    
+    if (currentVodType === 'POST_ROLL') {
+      const base = String(state.videoLength) === '30' ? 20000 : 15000;
+      const applied = Math.round(base * (1 - bonusRate / 100));
+      return {
+        billingLabel: 'CPM',
+        basePrice: base,
+        appliedPrice: applied
+      };
+    }
+    
+    if (currentVodType === 'MOBILE_BTV') {
+      const base = 10000;
+      const applied = Math.round(base * (1 - bonusRate / 100));
+      return {
+        billingLabel: 'CPM',
+        basePrice: base,
+        appliedPrice: applied
+      };
+    }
+
+    // 기본: PRE_ROLL (CPV)
+    let base = 20;
+    if (String(state.videoLength) === '7') base = 10;
+    else if (String(state.videoLength) === '15') base = 20;
+    else if (String(state.videoLength) === '30') base = 40;
+
+    const applied = Number((base * (1 - bonusRate / 100)).toFixed(1));
+    return {
+      billingLabel: 'CPV',
+      basePrice: base,
+      appliedPrice: applied
+    };
+  }, [currentVodType, state.videoLength, calculation]);
+
   return (
     <div className="bg-slate-800 border border-slate-700 p-6 rounded-2xl shadow-xl space-y-6">
       {/* 1. 상단 타이틀 */}
@@ -155,7 +193,7 @@ export default function Step3Package({ state, actions, calculation, onPrev, onNe
         </label>
         
         {isBtv ? (
-          /* 실시간 광고(AD+) 모드: 기존 5개 길이 옵션 */
+          /* 실시간 광고(AD+) 모드 */
           <div className="grid grid-cols-5 gap-2">
             {btvVideoLengths.map((len) => {
               const isSelected = String(state.videoLength) === String(len);
@@ -180,7 +218,7 @@ export default function Step3Package({ state, actions, calculation, onPrev, onNe
             })}
           </div>
         ) : (
-          /* 로딩광고(VOD) 모드: 선택된 VOD 유형별 전용 소재 길이 옵션 */
+          /* 로딩광고(VOD) 모드: 유형별 동적 선택 옵션 */
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {(VOD_LENGTH_OPTIONS[currentVodType] || VOD_LENGTH_OPTIONS.PRE_ROLL).map((opt) => {
               const isSelected = String(state.videoLength) === String(opt.id);
@@ -206,7 +244,7 @@ export default function Step3Package({ state, actions, calculation, onPrev, onNe
         )}
       </div>
 
-      {/* 4. 선택한 조건 및 산출 CPV 요약 카드 */}
+      {/* 4. 선택한 조건 및 산출 단가 요약 카드 (CPV / CPM 자동 변환) */}
       <div className="bg-slate-950 p-4 rounded-xl border border-slate-700 flex flex-col sm:flex-row justify-between items-start sm:items-center text-sm gap-3">
         <div>
           <span className="text-slate-400">선택한 조건:</span>{' '}
@@ -224,15 +262,25 @@ export default function Step3Package({ state, actions, calculation, onPrev, onNe
 
         <div className="flex space-x-6 text-right w-full sm:w-auto justify-between sm:justify-end border-t sm:border-t-0 border-slate-800 pt-2 sm:pt-0">
           <div>
-            <div className="text-xs text-slate-400">산출 기본 CPV</div>
-            <div className="text-lg font-bold text-slate-200">
-              {calculation?.calcBaseCPV ?? 0} 원
+            <div className="text-xs text-slate-400 font-medium">
+              {isBtv ? '산출 기본 CPV' : `산출 기본 ${vodPriceData.billingLabel}`}
+            </div>
+            <div className="text-lg font-bold text-slate-200 font-mono">
+              {isBtv 
+                ? `${(calculation?.calcBaseCPV ?? 0).toLocaleString()} 원`
+                : `${vodPriceData.basePrice.toLocaleString()} 원`
+              }
             </div>
           </div>
           <div>
-            <div className="text-xs text-emerald-400 font-bold">최종 적용 CPV</div>
-            <div className="text-2xl font-black text-emerald-400">
-              {calculation?.calcAppliedCPV ?? 0} 원
+            <div className="text-xs text-emerald-400 font-bold">
+              {isBtv ? '최종 적용 CPV' : `최종 적용 ${vodPriceData.billingLabel}`}
+            </div>
+            <div className="text-2xl font-black text-emerald-400 font-mono">
+              {isBtv 
+                ? `${(calculation?.calcAppliedCPV ?? 0).toLocaleString()} 원`
+                : `${vodPriceData.appliedPrice.toLocaleString()} 원`
+              }
             </div>
           </div>
         </div>
