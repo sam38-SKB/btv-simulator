@@ -6,38 +6,64 @@ import {
   VIDEO_LENGTH_INFO 
 } from '../../constants/pricingData';
 
+// VOD 3가지 상품 유형 정의
+const VOD_TYPES = [
+  {
+    id: 'PRE_ROLL',
+    name: 'VOD Pre-roll',
+    billing: 'CPV',
+    desc: 'VOD 시청 직전 스킵 없는 동영상 광고',
+    prices: '7초 이하 10원 / 15초 이하 20원 / 30초 이하 40원'
+  },
+  {
+    id: 'POST_ROLL',
+    name: 'VOD Post-roll',
+    billing: 'CPM',
+    desc: 'VOD 시청 완료 직후 엔딩 동영상 광고',
+    prices: '15초 이하 15,000원 / 15초 초과 20,000원'
+  },
+  {
+    id: 'MOBILE_BTV',
+    name: '모바일 B tv',
+    billing: 'CPM',
+    desc: '모바일 B tv 앱 내 전/후 동영상 광고',
+    prices: '60초 이하 10,000원'
+  }
+];
+
+// VOD 유형별 하단 동적 소재 영상 길이 및 단가 옵션 맵
+const VOD_LENGTH_OPTIONS = {
+  PRE_ROLL: [
+    { id: '7', label: '7초 이하', priceText: '10원' },
+    { id: '15', label: '15초 이하', priceText: '20원' },
+    { id: '30', label: '30초 이하', priceText: '40원' }
+  ],
+  POST_ROLL: [
+    { id: '15', label: '15초 이하', priceText: '15,000원/CPM' },
+    { id: '30', label: '15초 초과', priceText: '20,000원/CPM' }
+  ],
+  MOBILE_BTV: [
+    { id: '60', label: '60초 이하', priceText: '10,000원/CPM' }
+  ]
+};
+
 export default function Step3Package({ state, actions, calculation, onPrev, onNext }) {
   const isBtv = state.platformMode === 'BTV';
 
-  // 소재 영상 길이 옵션
+  // 실시간 BTV 모드 전용 소재 영상 길이
   const btvVideoLengths = ['15', '20', '30', '45', '60'];
-  const addr3VideoLengths = ['6', '7', '15', '20', '30', '40', '45', '60'];
-  const activeVideoLengths = isBtv ? btvVideoLengths : addr3VideoLengths;
 
-  // VOD 3가지 상품 규격 정의 (ADDR3 모드)
-  const vodTypes = [
-    {
-      id: 'PRE_ROLL',
-      name: 'VOD Pre-roll',
-      billing: 'CPV',
-      desc: 'VOD 시청 직전 스킵 없는 동영상 광고',
-      prices: '7초 이하 10원 / 15초 이하 20원 / 30초 이하 40원'
-    },
-    {
-      id: 'POST_ROLL',
-      name: 'VOD Post-roll',
-      billing: 'CPM',
-      desc: 'VOD 시청 완료 직후 엔딩 동영상 광고',
-      prices: '15초 이하 15,000원 / 15초 초과 20,000원'
-    },
-    {
-      id: 'MOBILE_BTV',
-      name: '모바일 B tv',
-      billing: 'CPM',
-      desc: '모바일 B tv 앱 내 전/후 동영상 광고',
-      prices: '60초 이하 10,000원'
-    }
-  ];
+  // 현재 선택된 VOD 광고 유형 (기본값: PRE_ROLL)
+  const currentVodType = state.productMode || state.vodType || 'PRE_ROLL';
+
+  // VOD 유형 클릭 핸들러 (유형 변경 시 해당 유형의 첫 번째 영상 길이를 자동 선택)
+  const handleSelectVodType = (vodId) => {
+    if (actions.setProductMode) actions.setProductMode(vodId);
+    if (actions.setVodType) actions.setVodType(vodId);
+    
+    const defaultLength = VOD_LENGTH_OPTIONS[vodId]?.[0]?.id || '15';
+    if (actions.setVideoLength) actions.setVideoLength(defaultLength);
+  };
 
   return (
     <div className="bg-slate-800 border border-slate-700 p-6 rounded-2xl shadow-xl space-y-6">
@@ -61,16 +87,13 @@ export default function Step3Package({ state, actions, calculation, onPrev, onNe
             VOD 광고 유형 선택 (3가지)
           </label>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {vodTypes.map((vod) => {
-              const isSelected = state.productMode === vod.id || (vod.id === 'PRE_ROLL' && !state.productMode);
+            {VOD_TYPES.map((vod) => {
+              const isSelected = currentVodType === vod.id;
               return (
                 <button
                   key={vod.id}
                   type="button"
-                  onClick={() => {
-                    if (actions.setProductMode) actions.setProductMode(vod.id);
-                    if (actions.setVodType) actions.setVodType(vod.id);
-                  }}
+                  onClick={() => handleSelectVodType(vod.id)}
                   className={`p-4 rounded-xl border text-left transition-all ${
                     isSelected
                       ? 'bg-sky-950 border-sky-400 text-white ring-1 ring-sky-400 shadow-lg'
@@ -93,7 +116,7 @@ export default function Step3Package({ state, actions, calculation, onPrev, onNe
           </div>
         </div>
       ) : (
-        /* ================= [BTV] 실시간 광고(AD+) 패키지 선택 (기존 원본 복구) ================= */
+        /* ================= [BTV] 실시간 광고(AD+) 패키지 선택 ================= */
         <div className="space-y-2">
           <label className="text-sm font-bold text-slate-200 block">
             B tv 채널 패키지 선택
@@ -125,39 +148,65 @@ export default function Step3Package({ state, actions, calculation, onPrev, onNe
         </div>
       )}
 
-      {/* 3. 소재 영상 길이 선택 (기존 원본 복구) */}
+      {/* 3. 소재 영상 길이 선택 (VOD 유형별 동적 변경) */}
       <div className="space-y-2 pt-3 border-t border-slate-700/60">
         <label className="text-sm font-bold text-slate-200 block">
           소재 영상 길이 선택
         </label>
-        <div className={`grid ${isBtv ? 'grid-cols-5' : 'grid-cols-4 sm:grid-cols-8'} gap-2`}>
-          {activeVideoLengths.map((len) => {
-            const isSelected = String(state.videoLength) === String(len);
-            const multStr = VIDEO_LENGTH_INFO[len]?.[isBtv ? 'btvMultStr' : 'addr3MultStr'] || '기본';
-            return (
-              <button 
-                key={len} 
-                type="button"
-                onClick={() => actions.setVideoLength(len)} 
-                className={`py-3 rounded-xl border font-bold text-sm transition text-center ${
-                  isSelected 
-                    ? isBtv 
+        
+        {isBtv ? (
+          /* 실시간 광고(AD+) 모드: 기존 5개 길이 옵션 */
+          <div className="grid grid-cols-5 gap-2">
+            {btvVideoLengths.map((len) => {
+              const isSelected = String(state.videoLength) === String(len);
+              const multStr = VIDEO_LENGTH_INFO[len]?.btvMultStr || '기본';
+              return (
+                <button 
+                  key={len} 
+                  type="button"
+                  onClick={() => actions.setVideoLength(len)} 
+                  className={`py-3 rounded-xl border font-bold text-sm transition text-center ${
+                    isSelected 
                       ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-md ring-1 ring-amber-300 font-black' 
-                      : 'bg-sky-600 text-white border-sky-400 shadow-md ring-1 ring-sky-300'
-                    : 'bg-slate-900 text-slate-300 border-slate-700 hover:border-slate-500'
-                }`}
-              >
-                {len}초
-                <span className="block text-xs font-normal opacity-80 mt-0.5">
-                  ({multStr})
-                </span>
-              </button>
-            );
-          })}
-        </div>
+                      : 'bg-slate-900 text-slate-300 border-slate-700 hover:border-slate-500'
+                  }`}
+                >
+                  {len}초
+                  <span className="block text-xs font-normal opacity-80 mt-0.5">
+                    ({multStr})
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          /* 로딩광고(VOD) 모드: 선택된 VOD 유형별 전용 소재 길이 옵션 */
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {(VOD_LENGTH_OPTIONS[currentVodType] || VOD_LENGTH_OPTIONS.PRE_ROLL).map((opt) => {
+              const isSelected = String(state.videoLength) === String(opt.id);
+              return (
+                <button 
+                  key={opt.id} 
+                  type="button"
+                  onClick={() => actions.setVideoLength(opt.id)} 
+                  className={`py-3.5 px-4 rounded-xl border font-bold text-sm transition text-center flex flex-col items-center justify-center space-y-0.5 ${
+                    isSelected 
+                      ? 'bg-sky-600 text-white border-sky-400 shadow-md ring-1 ring-sky-300' 
+                      : 'bg-slate-900 text-slate-300 border-slate-700 hover:border-slate-500'
+                  }`}
+                >
+                  <span>{opt.label}</span>
+                  <span className={`text-xs font-semibold ${isSelected ? 'text-amber-200' : 'text-amber-400'}`}>
+                    ({opt.priceText})
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
-      {/* 4. 선택한 조건 및 산출 CPV 요약 카드 (기존 원본 복구) */}
+      {/* 4. 선택한 조건 및 산출 CPV 요약 카드 */}
       <div className="bg-slate-950 p-4 rounded-xl border border-slate-700 flex flex-col sm:flex-row justify-between items-start sm:items-center text-sm gap-3">
         <div>
           <span className="text-slate-400">선택한 조건:</span>{' '}
@@ -168,7 +217,7 @@ export default function Step3Package({ state, actions, calculation, onPrev, onNe
           <strong className="text-amber-300 text-base">
             {isBtv 
               ? BTV_PACKAGE_BASE_CPV[state.channelPackage]?.name 
-              : (ADDR3_PRIME_PACK_MAP[state.productMode]?.name || state.productMode || 'VOD 기본')
+              : (VOD_TYPES.find(v => v.id === currentVodType)?.name || 'VOD Pre-roll')
             }
           </strong>
         </div>
