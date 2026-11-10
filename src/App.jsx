@@ -18,6 +18,7 @@ import Step4Audience from './components/steps/Step4Audience';
 import Step5Estimate from './components/steps/Step5Estimate';
 
 import ProductInfoView from './components/info/ProductInfoView';
+import MediaNewsView from './components/news/MediaNewsView';
 import AdminPanel from './components/admin/AdminPanel';
 import ChatbotDrawer from './components/common/ChatbotDrawer';
 import ProposalModal from './components/common/ProposalModal';
@@ -169,7 +170,7 @@ export default function App() {
     }
   };
 
-  // 3. 로그인 및 회원가입 전용 독립 화면 처리 (기존 if (!currentUser) 제거)
+  // 3. 로그인 및 회원가입 전용 독립 화면 처리
   if (currentTab === 'LOGIN') {
     return <LoginView onLogin={handleLogin} onGoSignup={() => setCurrentTab('SIGNUP')} />;
   }
@@ -230,17 +231,9 @@ export default function App() {
           <ProductInfoView onGoSimulator={(mode) => handleSelectTab(mode)} />
         )}
 
-        {/* B tv 매체 소식 */}
+        {/* B tv 매체 소식 (2026년 4월호 리포트 웹 게재) */}
         {currentTab === 'NEWS' && (
-          <div className="bg-slate-900 border border-slate-700 p-8 rounded-2xl shadow-xl space-y-4 text-center">
-            <h3 className="text-xl font-bold text-emerald-400 flex items-center justify-center space-x-2">
-              <span>📰</span>
-              <span>B tv 매체 소식</span>
-            </h3>
-            <p className="text-sm text-slate-400">
-              최신 B tv 광고 리포트, 월별 매체 상품 업데이트 및 프로모션 공지사항이 게재될 영역입니다.
-            </p>
-          </div>
+          <MediaNewsView />
         )}
 
         {/* 실시간 광고(AD+) & 로딩광고(VOD) 시뮬레이터 스텝 */}
